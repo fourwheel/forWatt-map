@@ -47,15 +47,15 @@ function styleFor(feature) {
   const fill = state.mode === 'sm' ? smColor(smValue(id)) : mcColor(mcValue(id));
   const covered = state.forwatt && state.matched.has(id);
 
-  if (!ok) return { fillColor: fill, weight: 0.5, color: '#0f172a', opacity: .5, fillOpacity: .06 };
+  if (!ok) return { fillColor: fill, weight: 0.5, color: '#ffffff', opacity: .5, fillOpacity: .05 };
   if (state.forwatt) {
-    // covered: keep the region's choropleth colour, mark coverage with an orange outline
+    // covered: keep the region's choropleth colour, mark coverage with the for.watt orange outline
     if (covered) return { fillColor: fill, weight: 2.5, color: '#E75420', opacity: 1, fillOpacity: .85 };
-    // non-covered: muted grey so the country shape stays visible (never blacked out)
-    return { fillColor: '#64748b', weight: 0.5, color: '#0f172a', opacity: .4, fillOpacity: .3 };
+    // non-covered: light grey wash so the country shape stays visible
+    return { fillColor: '#B8C0C4', weight: 0.5, color: '#ffffff', opacity: .6, fillOpacity: .45 };
   }
-  if (state.selected === id) return { fillColor: fill, weight: 2.5, color: '#38bdf8', opacity: 1, fillOpacity: .85 };
-  return { fillColor: fill, weight: 1, color: '#0f172a', opacity: .8, fillOpacity: smValue(id) != null || mcValue(id) != null ? .7 : .35 };
+  if (state.selected === id) return { fillColor: fill, weight: 3, color: '#1D1D1D', opacity: 1, fillOpacity: .9 };
+  return { fillColor: fill, weight: 1, color: '#ffffff', opacity: .8, fillOpacity: smValue(id) != null || mcValue(id) != null ? .72 : .3 };
 }
 function restyle() { if (geoLayer) geoLayer.setStyle(styleFor); }
 
@@ -91,7 +91,7 @@ async function init() {
   for (const [k, v] of Object.entries(sm.meter_counts || {})) meterCounts[k] = typeof v === 'object' ? v.total : v;
 
   map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([51.2, 10.4], 6);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19,
   }).addTo(map);
 
