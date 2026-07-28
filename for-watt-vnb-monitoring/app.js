@@ -49,7 +49,8 @@ function styleFor(feature) {
 
   if (!ok) return { fillColor: fill, weight: 0.5, color: '#0f172a', opacity: .5, fillOpacity: .06 };
   if (state.forwatt) {
-    if (covered) return { fillColor: '#E75420', weight: 2, color: '#ffb08a', opacity: 1, fillOpacity: .85 };
+    // covered: keep the region's choropleth colour, mark coverage with an orange outline
+    if (covered) return { fillColor: fill, weight: 2.5, color: '#E75420', opacity: 1, fillOpacity: .85 };
     // non-covered: muted grey so the country shape stays visible (never blacked out)
     return { fillColor: '#64748b', weight: 0.5, color: '#0f172a', opacity: .4, fillOpacity: .3 };
   }
