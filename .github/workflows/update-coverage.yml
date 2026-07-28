@@ -7,9 +7,9 @@ on:
   push:
     branches: [main]
     paths:                    # regenerate when scraper/matcher/operator list changes
-      - 'for-watt-vnb-monitoring/scripts/**'
-      - 'for-watt-vnb-monitoring/lib/**'
-      - 'for-watt-vnb-monitoring/data/dso.json'
+      - 'scripts/**'
+      - 'lib/**'
+      - 'data/dso.json'
 
 permissions:
   contents: write
@@ -17,10 +17,6 @@ permissions:
 concurrency:
   group: update-coverage
   cancel-in-progress: false
-
-defaults:
-  run:
-    working-directory: for-watt-vnb-monitoring
 
 jobs:
   update:
