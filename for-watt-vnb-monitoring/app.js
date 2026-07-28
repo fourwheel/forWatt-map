@@ -25,6 +25,11 @@ function mcColor(c) {
 }
 const smValue = id => { const e = smData[id]; return e ? e[state.smMetric] : null; };
 const mcValue = id => (id in meterCounts ? meterCounts[id] : null);
+const smMit = id => { const e = smData[id]; return e ? e.mit : null; };        // fixed metric for partner figures
+const smartMeters = id => { const r = smMit(id), mc = mcValue(id); return r != null && mc != null ? Math.round(r * mc) : null; };
+const fmtK = n => n == null ? '–' : n >= 1e6 ? (n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' Mio.'
+  : n >= 1e3 ? Math.round(n / 1e3).toLocaleString('de-DE') + 'k' : String(Math.round(n));
+const pct = r => r == null ? 'k. A.' : (r * 100).toFixed(1) + ' %';
 
 // ---------- filtering ----------
 function passes(id) {
@@ -254,6 +259,7 @@ async function loadForwatt() {
     status.className = 'forwatt-status ok';
     status.textContent = `${nMatched} von ${nTotal} Partnern auf VNB-Gebiete abgebildet` +
       (cov.stale ? ' (zwischengespeichert)' : '');
+    renderForwattSummary();
     renderForwattList();
     renderList();
     restyle();
@@ -262,22 +268,57 @@ async function loadForwatt() {
     status.textContent = 'for.watt-Abdeckung nicht verfügbar: ' + e.message;
   }
 }
+// Germany-wide estimate: share of metering points / smart meters that sit in a
+// for.watt-supported grid territory. Only territory-based (grundzuständige) MSBs
+// can be located geographically, so this is a lower bound — noted in the UI.
+function forwattStats() {
+  let totalMeters = 0, coveredMeters = 0, totalSmart = 0, coveredSmart = 0;
+  for (const id in meterCounts) {
+    const mc = meterCounts[id];
+    if (mc == null) continue;
+    const smart = smartMeters(id) || 0;
+    totalMeters += mc; totalSmart += smart;
+    if (state.matched.has(id)) { coveredMeters += mc; coveredSmart += smart; }
+  }
+  return { totalMeters, coveredMeters, totalSmart, coveredSmart,
+    meterPct: totalMeters ? coveredMeters / totalMeters : 0,
+    smartPct: totalSmart ? coveredSmart / totalSmart : 0 };
+}
+
+function renderForwattSummary() {
+  const s = forwattStats();
+  document.getElementById('forwatt-summary').innerHTML = `
+    <div class="fw-sum-head">Deutschlandweite for.watt-Abdeckung*</div>
+    <div class="fw-sum-grid">
+      <div><b>${pct(s.meterPct)}</b><span>der Zählpunkte<br>${fmtK(s.coveredMeters)} / ${fmtK(s.totalMeters)}</span></div>
+      <div><b>${pct(s.smartPct)}</b><span>der Smart Meter<br>${fmtK(s.coveredSmart)} / ${fmtK(s.totalSmart)}</span></div>
+    </div>
+    <div class="fw-foot">* über grundzuständige Netzgebiete; überregionale Messstellenbetreiber sind nicht enthalten.</div>`;
+}
+
 function renderForwattList() {
   const el = document.getElementById('forwatt-list');
   const parts = state.coverage.partners;
-  const matched = parts.filter(p => p.vnbId).sort((a, b) => (a.vnbName || '').localeCompare(b.vnbName || ''));
+  const matched = parts.filter(p => p.vnbId).sort((a, b) => (smartMeters(b.vnbId) ?? -1) - (smartMeters(a.vnbId) ?? -1));
   const other = parts.filter(p => !p.vnbId).sort((a, b) => a.name.localeCompare(b.name));
-  const item = p => `
-    <div class="fw-item ${p.vnbId ? 'matched' : 'unmatched'}" ${p.vnbId ? `data-id="${p.vnbId}"` : ''}>
-      <span class="dot"></span>
-      <span class="who">${esc(p.vnbId ? p.vnbName : p.name)}</span>
-      <span class="where">${p.vnbId ? esc(p.city || '') : 'überregional / ESA'}</span>
+  const matchedItem = p => `
+    <div class="fw-item matched" data-id="${p.vnbId}">
+      <div class="fw-row1"><span class="dot"></span><span class="who">${esc(p.vnbName)}</span><span class="where">${esc(p.city || '')}</span></div>
+      <div class="fw-metrics">
+        <span title="Smart-Meter-Quote (mit opt. Einbaufällen)">${pct(smMit(p.vnbId))} Quote</span>
+        <span title="Anzahl Smart Meter">${fmtK(smartMeters(p.vnbId))} Smart Meter</span>
+        <span title="Zählpunkte gesamt">${fmtK(mcValue(p.vnbId))} Zähler</span>
+      </div>
+    </div>`;
+  const otherItem = p => `
+    <div class="fw-item unmatched">
+      <div class="fw-row1"><span class="dot"></span><span class="who">${esc(p.name)}</span><span class="where">überregional / ESA</span></div>
     </div>`;
   el.innerHTML =
     `<div class="fw-group">Messstellenbetreiber auf der Karte · ${matched.length}</div>` +
-    matched.map(item).join('') +
+    matched.map(matchedItem).join('') +
     `<div class="fw-group">Weitere for.watt-Partner · ${other.length}</div>` +
-    other.map(item).join('');
+    other.map(otherItem).join('');
   el.querySelectorAll('.fw-item.matched').forEach(it => it.onclick = () => focusVnb(it.dataset.id));
 }
 
