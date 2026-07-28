@@ -1,0 +1,38 @@
+name: Update for.watt coverage
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  workflow_dispatch:          # manual "Run workflow" button
+  push:
+    branches: [main]
+    paths:                    # regenerate when scraper/matcher/operator list changes
+      - 'scripts/**'
+      - 'lib/**'
+      - 'data/dso.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-coverage
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install playwright@1.48.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/update-coverage.cjs
+      - name: Commit refreshed coverage
+        run: |
+          git config user.name "coverage-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/forwatt-coverage.json
+          git diff --staged --quiet || git commit -m "chore: refresh for.watt coverage [skip ci]"
+          git push
