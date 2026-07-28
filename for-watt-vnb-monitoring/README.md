@@ -3,7 +3,7 @@
 A map of German distribution grid operators (Verteilnetzbetreiber) coloured by their
 smart-meter rollout quota, with an overlay for the **Messstellenbetreiber supported by for.watt**.
 
-**Live:** https://elboiler.github.io/
+**Live:** https://elboiler.github.io/for-watt-vnb-monitoring/
 
 ## What it does
 
