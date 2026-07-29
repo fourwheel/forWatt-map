@@ -11,7 +11,7 @@ const state = {
   selected: null,
 };
 
-let map, geoLayer, dsoById = {}, smData = {}, meterCounts = {}, layersByVnb = {};
+let map, geoLayer, dsoById = {}, dsoList = [], smData = {}, meterCounts = {}, layersByVnb = {};
 
 // ---------- color scales ----------
 function smColor(r) {
@@ -84,6 +84,7 @@ async function init() {
     fetch('data/sm.json').then(r => r.json()),
   ]);
 
+  dsoList = dso;
   dso.forEach(d => { dsoById[d.id] = d; });
   const period = sm.periods[sm.periods.length - 1];
   smData = period.data;
@@ -246,27 +247,25 @@ function focusVnb(id) {
   if (layer) layer.openTooltip();
 }
 
-// ---------- for.watt coverage (auto-refresh each load) ----------
+// ---------- for.watt coverage (from the maintained list, resolved on each load) ----------
 async function loadForwatt() {
   const status = document.getElementById('forwatt-status');
-  status.className = 'forwatt-status'; status.textContent = 'Abdeckung wird abgerufen…';
+  status.className = 'forwatt-status'; status.textContent = 'Messstellenbetreiber werden geladen…';
   try {
-    // cache-bust so each page open gets the latest committed coverage
-    const cov = await fetch('data/forwatt-coverage.json?t=' + Date.now()).then(r => r.json());
-    if (cov.error && !cov.partners.length) throw new Error(cov.error);
+    // cache-bust so each page open reflects the latest committed list
+    const list = await fetch('data/messstellenbetreiber.json?t=' + Date.now()).then(r => r.json());
+    const cov = MsbMatch.resolve(list.operators, dsoList, list.aliases);
     state.coverage = cov;
     state.matched = new Set(cov.matchedVnbIds);
-    const nMatched = cov.matchedVnbIds.length, nTotal = cov.partners.length;
     status.className = 'forwatt-status ok';
-    status.textContent = `${nMatched} von ${nTotal} Partnern auf VNB-Gebiete abgebildet` +
-      (cov.stale ? ' (zwischengespeichert)' : '');
+    status.textContent = `${cov.matchedVnbIds.length} von ${cov.partners.length} Messstellenbetreiber auf VNB-Gebiete abgebildet`;
     renderForwattSummary();
     renderForwattList();
     renderList();
     restyle();
   } catch (e) {
     status.className = 'forwatt-status err';
-    status.textContent = 'for.watt-Abdeckung nicht verfügbar: ' + e.message;
+    status.textContent = 'Messstellenbetreiber-Liste nicht verfügbar: ' + e.message;
   }
 }
 // Germany-wide estimate: share of metering points / smart meters that sit in a

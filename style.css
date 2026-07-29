@@ -127,6 +127,11 @@ body {
 .vnb-row .badge { font-weight: 650; font-size: .74rem; padding: 2px 7px; border-radius: 6px; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.25); }
 .vnb-row .fwtag { color: var(--accent); font-size: .82rem; }
 
+/* credit footer */
+.credit { font-size: .7rem; color: var(--muted); line-height: 1.5; border-bottom: none; }
+.credit a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.credit a:hover { text-decoration: underline; }
+
 /* sidebar toggle */
 .sidebar-toggle {
   position: absolute; left: 430px; top: 50%; transform: translateY(-50%); z-index: 1000;

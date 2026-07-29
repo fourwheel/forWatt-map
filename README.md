@@ -5,46 +5,51 @@ smart-meter rollout quota, with an overlay for the **Messstellenbetreiber suppor
 
 **Live:** https://elboiler.github.io/for-watt-vnb-monitoring/
 
+Built on the great work at [vnb-monitoring.org](https://vnb-monitoring.org/), enhanced by
+[Thomas Boyle](https://www.linkedin.com/in/tom-boyle-92345a17/).
+
 ## What it does
 
-- **Map** – Leaflet choropleth of all 793 VNB territories on a dark CARTO basemap.
+- **Map** – Leaflet choropleth of all 793 VNB territories on a light CARTO basemap.
   Modes: *Smart-Meter-Quote* (Q4 2025, with/without optional install cases) and *Anzahl Zähler*.
-  Filters (quote %, meter count), a live ranking list, and hover tooltips.
-- **for.watt overlay** – toggle in the sidebar. Territories whose operator is a
-  for.watt-supported Messstellenbetreiber are outlined in for.watt orange; the rest turn grey.
-  The sidebar always lists the supported operators (on-map MSBs + other partners).
-- **Auto-refresh** – the page loads `data/forwatt-coverage.json` (cache-busted) on every open,
-  so it always shows the latest known coverage.
+  Filters (quote %, meter count), a ranking list, and hover tooltips.
+- **for.watt overlay** – toggle in the sidebar. Territories whose operator is a for.watt-supported
+  Messstellenbetreiber keep their choropleth colour and get a for.watt-orange outline; the rest grey out.
+  Each on-map operator shows its Smart-Meter-Quote, smart-meter count and total meters.
+- **Germany-wide estimate** – share of metering points / smart meters that sit in a for.watt
+  grid territory (lower bound; überregionale MSB have no single area and are listed separately).
 
-## How the coverage stays current (static hosting)
+## The Messstellenbetreiber list (source of truth)
 
-GitHub Pages is static, so the scrape runs in CI instead of at request time.
-`.github/workflows/update-coverage.yml` runs every 6 hours (and on demand): it renders
-forwatt.io with Playwright (the partner grid is Blazor-rendered, invisible to a plain fetch),
-matches the logos to VNB territories by name/city, and commits `data/forwatt-coverage.json`.
-Each commit redeploys the page.
+`data/messstellenbetreiber.json` is a **manually maintained** list. To update coverage, edit
+`operators` (add/remove names) and commit — the page resolves it to VNB territories on every load.
+
+```json
+{
+  "operators": ["Stromnetz Berlin GmbH", "WEMAG Netz GmbH", "..."],
+  "aliases": { "Tricky MSB name": "Exact VNB name in the dataset" }
+}
+```
+
+Matching is by **operator name only** (never city — that is what previously mis-mapped
+"Stadtwerke Erfurt" to TEN). Every match must share a distinctive name token with its VNB;
+operators that are national/independent MSBs (e.g. metrify, Solandeo, wattline, 50Hertz) have no
+single territory and appear under *Weitere for.watt-Partner*. Use `aliases` to force a specific
+VNB if a name ever fails to resolve.
+
+Verify the list after editing:
+
+```bash
+npm run check          # prints every mapping; fails if any match isn't name-anchored
+```
 
 ## Local preview
 
 ```bash
-node server.js          # http://localhost:5173  (zero deps)
-```
-
-Refresh coverage locally:
-
-```bash
-npm install             # installs Playwright
-npx playwright install chromium
-npm run update-coverage
+node server.js         # http://localhost:5173  (zero deps)
 ```
 
 ## Data
 
 `data/geo.json`, `dso.json`, `sm.json` are a decoded snapshot of the public Bundesnetzagentur
 smart-meter rollout dataset (operator name, city, voltage levels, quota, meter count).
-
-## Matching notes
-
-17 of the current for.watt partners map to a VNB territory. Pure energy-service providers
-and national/independent metering operators have no single grid area and are listed under
-*Weitere for.watt-Partner*.
