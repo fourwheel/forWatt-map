@@ -287,13 +287,15 @@ function forwattStats() {
 
 function renderForwattSummary() {
   const s = forwattStats();
+  const wmsb = state.coverage.partners.filter(p => !p.vnbId).length;
   document.getElementById('forwatt-summary').innerHTML = `
     <div class="fw-sum-head">Deutschlandweite for.watt-Abdeckung*</div>
     <div class="fw-sum-grid">
       <div><b>${pct(s.meterPct)}</b><span>der Zählpunkte<br>${fmtK(s.coveredMeters)} / ${fmtK(s.totalMeters)}</span></div>
       <div><b>${pct(s.smartPct)}</b><span>der Smart Meter<br>${fmtK(s.coveredSmart)} / ${fmtK(s.totalSmart)}</span></div>
     </div>
-    <div class="fw-foot">* über grundzuständige Netzgebiete; überregionale Messstellenbetreiber sind nicht enthalten.</div>`;
+    <div class="fw-wmsb-note">+ ${wmsb} wMSB — bundesweit tätig, nicht in den Zahlen enthalten</div>
+    <div class="fw-foot">* nur über grundzuständige Netzgebiete (gMSB). Wettbewerbliche MSB (wMSB) sind bundesweit tätig und keinem Netzgebiet zugeordnet; die tatsächliche for.watt-Reichweite liegt daher höher.</div>`;
 }
 
 function renderForwattList() {

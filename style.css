@@ -72,6 +72,7 @@ body {
 .fw-sum-grid > div { display: flex; flex-direction: column; }
 .fw-sum-grid b { font-size: 1.35rem; color: var(--accent); font-weight: 700; line-height: 1.1; }
 .fw-sum-grid span { font-size: .68rem; color: var(--muted); margin-top: 3px; }
+.fw-wmsb-note { font-size: .72rem; font-weight: 600; color: #8a6d00; background: var(--accent-2); border-radius: 6px; padding: 4px 8px; margin-top: 10px; }
 .fw-foot { font-size: .64rem; color: var(--muted); margin-top: 8px; opacity: .85; }
 
 .forwatt-list { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow-y: auto; }
