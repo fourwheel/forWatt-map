@@ -312,12 +312,12 @@ function renderForwattList() {
     </div>`;
   const otherItem = p => `
     <div class="fw-item unmatched">
-      <div class="fw-row1"><span class="dot"></span><span class="who">${esc(p.name)}</span><span class="where">überregional / ESA</span></div>
+      <div class="fw-row1"><span class="dot"></span><span class="who">${esc(p.name)}</span><span class="where">wMSB</span></div>
     </div>`;
   el.innerHTML =
-    `<div class="fw-group">Messstellenbetreiber auf der Karte · ${matched.length}</div>` +
+    `<div class="fw-group">Grundzuständige MSB · mit Netzgebiet · ${matched.length}</div>` +
     matched.map(matchedItem).join('') +
-    `<div class="fw-group">Weitere for.watt-Partner · ${other.length}</div>` +
+    `<div class="fw-group">Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}</div>` +
     other.map(otherItem).join('');
   el.querySelectorAll('.fw-item.matched').forEach(it => it.onclick = () => focusVnb(it.dataset.id));
 }

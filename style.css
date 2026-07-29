@@ -81,7 +81,8 @@ body {
 .fw-row1 { display: flex; align-items: center; gap: 8px; }
 .fw-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .fw-item.matched .dot { background: var(--accent); }
-.fw-item.unmatched .dot { background: var(--border); }
+.fw-item.unmatched .dot { background: var(--accent-2); }
+.fw-item.unmatched .where { background: var(--accent-2); color: #5c4a00; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
 .fw-item.matched { cursor: pointer; }
 .fw-item.matched:hover { background: var(--accent-bg); }
 .fw-item .who { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
