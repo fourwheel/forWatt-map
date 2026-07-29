@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "check": "node scripts/check-coverage.cjs"
+    "check": "node scripts/check-coverage.cjs",
+    "update-data": "node scripts/update-data.cjs"
   }
 }
