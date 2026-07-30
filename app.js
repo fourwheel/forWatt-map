@@ -3,7 +3,7 @@
 const state = {
   mode: 'sm',            // 'sm' | 'mc'
   smMetric: 'mit',       // 'mit' | 'ohne'
-  forwatt: false,
+  forwatt: true,
   smRange: [0, 1],       // ratio
   mcRange: [0, 4000000],
   coverage: null,        // { partners, matchedVnbIds }

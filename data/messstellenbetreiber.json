@@ -1,6 +1,6 @@
 {
   "source": "for.watt unterstützte Messstellenbetreiber – manuell gepflegt",
-  "updated": "2026-07-29",
+  "updated": "2026-07-30",
   "note": "Diese Liste ist die Datenquelle für das Overlay. Zum Aktualisieren einfach Einträge in 'operators' ergänzen/entfernen und committen. 'aliases' erzwingt bei Bedarf eine bestimmte VNB-Zuordnung (Name des MSB -> exakter VNB-Name im Datensatz).",
   "operators": [
     "50Hertz Transmission GmbH",
@@ -58,5 +58,12 @@
     "wattline GmbH",
     "WEMAG Netz GmbH"
   ],
-  "aliases": {}
+  "aliases": {
+    "Netzgesellschaft Bitterfeld-Wolfen GmbH": "Netzgesellschaft Bitterfeld-Wolfen mbH",
+    "Stadtwerke Glauchau Dienstleistungsgesellschaft mbH": "Stadtwerke Glauchau Dienstleistungsgesellschaft",
+    "Stadtwerke Oelsnitz (Vogtl.) GmbH": "Stadtwerke OELSNITZ/V. GmbH",
+    "Strom-und Gasnetz Wismar GmbH": "Strom- und Gasnetz Wismar GmbH",
+    "StWB Stadtwerke Brandenburg an der Havel GmbH & Co. KG": "StWB Stadtwerke Brandenburg an der Havel GmbH &",
+    "SWE Netz GmbH": "SWE Netz GmbH (Erfurt)"
+  }
 }
