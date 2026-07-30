@@ -1,7 +1,7 @@
 {
   "name": "vnb-forwatt-clone",
   "version": "1.1.0",
-  "description": "VNB-Karte Deutschland with for.watt Messstellenbetreiber coverage overlay",
+  "description": "VNB-Karte Deutschland with for.Watt Messstellenbetreiber coverage overlay",
   "private": true,
   "scripts": {
     "start": "node server.js",

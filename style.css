@@ -1,6 +1,6 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
-  /* for.watt brand tokens */
+  /* for.Watt brand tokens */
   --bg: #F5F6F7; --panel: #FFFFFF; --panel2: #F5F6F7; --border: #E0E0E0;
   --text: #1D1D1D; --muted: #617177; --accent: #E75420; --accent-bg: #FCEAE3;
   --accent-2: #FFC100; --forwatt: #E75420; --sel: #1D1D1D;
@@ -23,14 +23,14 @@ body {
 .sidebar {
   width: 430px; flex-shrink: 0; background: var(--panel);
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
-  overflow-y: auto; transition: margin-left .3s ease, opacity .3s ease;
+  overflow: hidden; transition: margin-left .3s ease, opacity .3s ease;
   box-shadow: 2px 0 12px rgba(0,0,0,.04);
 }
 .sidebar.collapsed { margin-left: -430px; opacity: 0; pointer-events: none; }
+.sidebar-scroll { flex: 1; overflow-y: auto; min-height: 0; }
 
 .sidebar-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
-.fw-wordmark { font-size: 1.15rem; font-weight: 700; letter-spacing: -.5px; color: var(--accent); }
-.fw-wordmark .dotwatt { color: var(--text); }
+.fw-logo { height: 28px; width: auto; display: block; }
 .sidebar-head h1 { font-size: 1.05rem; font-weight: 600; margin-top: 8px; }
 .sidebar-head .sub { font-size: .76rem; color: var(--muted); margin-top: 4px; }
 
@@ -59,7 +59,7 @@ body {
 .legend .stats { display: flex; gap: 12px; flex-wrap: wrap; font-size: .72rem; color: var(--muted); margin-top: 8px; }
 .legend .stats b { color: var(--text); font-weight: 600; }
 
-/* for.watt panel */
+/* for.Watt panel */
 .forwatt-panel .panel-title span:last-child { color: var(--text); font-weight: 600; letter-spacing: 0; text-transform: none; font-size: .9rem; }
 .forwatt-status { font-size: .75rem; color: var(--muted); margin-bottom: 10px; }
 .forwatt-status.ok { color: #138719; }
@@ -130,7 +130,7 @@ body {
 .vnb-row .fwtag { color: var(--accent); font-size: .82rem; }
 
 /* credit footer */
-.credit { font-size: .7rem; color: var(--muted); line-height: 1.5; border-bottom: none; }
+.credit { font-size: .7rem; color: var(--muted); line-height: 1.5; border-bottom: none; border-top: 1px solid var(--border); flex-shrink: 0; }
 .credit a { color: var(--accent); text-decoration: none; font-weight: 500; }
 .credit a:hover { text-decoration: underline; }
 

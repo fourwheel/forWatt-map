@@ -49,7 +49,7 @@ function styleFor(feature) {
 
   if (!ok) return { fillColor: fill, weight: 0.5, color: '#ffffff', opacity: .5, fillOpacity: .05 };
   if (state.forwatt) {
-    // covered: keep the region's choropleth colour, mark coverage with the for.watt orange outline
+    // covered: keep the region's choropleth colour, mark coverage with the for.Watt orange outline
     if (covered) return { fillColor: fill, weight: 2.5, color: '#E75420', opacity: 1, fillOpacity: .85 };
     // non-covered: light grey wash so the country shape stays visible
     return { fillColor: '#B8C0C4', weight: 0.5, color: '#ffffff', opacity: .6, fillOpacity: .45 };
@@ -71,7 +71,7 @@ function tooltipHtml(f) {
     <div class="c">${esc(p.city || '')} · ${(p.types || []).length} Spannungsebenen</div>
     <div class="kv"><span>Smart-Meter-Quote</span><b>${sm != null ? (sm * 100).toFixed(1) + ' %' : 'k. A.'}</b></div>
     <div class="kv"><span>Zähler</span><b>${mc != null ? mc.toLocaleString('de-DE') : 'k. A.'}</b></div>
-    ${cov ? `<div class="fw">● for.watt-Abdeckung${partner ? ' · ' + esc(partner.name) : ''}</div>` : ''}
+    ${cov ? `<div class="fw">● for.Watt-Abdeckung${partner ? ' · ' + esc(partner.name) : ''}</div>` : ''}
   </div>`;
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -108,7 +108,7 @@ async function init() {
 
   document.getElementById('loading').style.display = 'none';
   wireControls();
-  renderLegend();
+  // renderLegend();  // Kartenmodus-Panel (inkl. #legend) ist im HTML auskommentiert
   renderList();
   updateCount();
   loadForwatt();  // auto-refresh coverage on every page open
@@ -128,11 +128,12 @@ function wireControls() {
   document.querySelectorAll('input[name=smmetric]').forEach(r =>
     r.onchange = () => { state.smMetric = r.value; restyle(); renderLegend(); renderList(); });
 
-  document.getElementById('forwatt-toggle').onchange = e => {
-    state.forwatt = e.target.checked;
-    if (state.forwatt && !state.coverage) loadForwatt(); // in case it hasn't landed yet
-    restyle();
-  };
+  // Schalter deaktiviert: for.Watt-Abdeckung ist dauerhaft aktiv (state.forwatt bleibt true).
+  // document.getElementById('forwatt-toggle').onchange = e => {
+  //   state.forwatt = e.target.checked;
+  //   if (state.forwatt && !state.coverage) loadForwatt(); // in case it hasn't landed yet
+  //   restyle();
+  // };
 
   document.getElementById('sidebar-toggle').onclick = e => {
     document.getElementById('sidebar').classList.toggle('collapsed');
@@ -141,7 +142,9 @@ function wireControls() {
     setTimeout(() => map.invalidateSize(), 320);
   };
 
-  document.getElementById('reset-btn').onclick = () => {
+  // Filter-Panel (inkl. #reset-btn) ist im HTML auskommentiert.
+  const resetBtn = document.getElementById('reset-btn');
+  if (resetBtn) resetBtn.onclick = () => {
     state.smRange = [0, 1]; state.mcRange = [0, 4000000]; state.selected = null;
     buildSliders(); applyFilterUi(); restyle();
   };
@@ -165,6 +168,7 @@ function buildSliders() {
 }
 function makeDual(elId, min, max, valLo, valHi, cb) {
   const el = document.getElementById(elId);
+  if (!el) return;  // Filter-Panel ist im HTML auskommentiert
   el.innerHTML = `<div class="track"><div class="fill"></div></div>
     <input type="range" class="lo" min="${min}" max="${max}" value="${valLo}">
     <input type="range" class="hi" min="${min}" max="${max}" value="${valHi}">`;
@@ -183,9 +187,11 @@ let filterTimer;
 function onFilterChange() { clearTimeout(filterTimer); filterTimer = setTimeout(() => { restyle(); renderList(); updateCount(); }, 60); }
 
 function updateCount() {
+  const el = document.getElementById('vnb-count');
+  if (!el) return;  // Filter-Panel ist im HTML auskommentiert
   const total = Object.keys(dsoById).length;
   const n = Object.keys(dsoById).filter(passes).length;
-  document.getElementById('vnb-count').textContent = `${n} / ${total} VNB`;
+  el.textContent = `${n} / ${total} VNB`;
 }
 
 // ---------- legend ----------
@@ -220,6 +226,7 @@ function legendBody(grad, ticks, vals, unit, kA, isCount) {
 function renderList() {
   const el = document.getElementById('vnb-list');
   const title = document.getElementById('list-title');
+  if (!el || !title) return;  // Ranking-Panel ist im HTML auskommentiert
   const ids = Object.keys(dsoById).filter(passes);
   const valFn = state.mode === 'sm' ? smValue : mcValue;
   title.textContent = state.mode === 'sm' ? 'Ranking Smart-Meter-Quote' : 'Ranking Anzahl Zähler';
@@ -232,7 +239,7 @@ function renderList() {
     return `<div class="vnb-row" data-id="${id}">
       <span class="rank">${i + 1}</span>
       <span class="name">${esc(d.name)}</span>
-      ${cov ? '<span class="fwtag" title="for.watt-Abdeckung">●</span>' : ''}
+      ${cov ? '<span class="fwtag" title="for.Watt-Abdeckung">●</span>' : ''}
       <span class="badge" style="background:${bg}">${label}</span>
     </div>`;
   }).join('');
@@ -247,7 +254,7 @@ function focusVnb(id) {
   if (layer) layer.openTooltip();
 }
 
-// ---------- for.watt coverage (from the maintained list, resolved on each load) ----------
+// ---------- for.Watt coverage (from the maintained list, resolved on each load) ----------
 async function loadForwatt() {
   const status = document.getElementById('forwatt-status');
   status.className = 'forwatt-status'; status.textContent = 'Messstellenbetreiber werden geladen…';
@@ -269,7 +276,7 @@ async function loadForwatt() {
   }
 }
 // Germany-wide estimate: share of metering points / smart meters that sit in a
-// for.watt-supported grid territory. Only territory-based (grundzuständige) MSBs
+// for.Watt-supported grid territory. Only territory-based (grundzuständige) MSBs
 // can be located geographically, so this is a lower bound — noted in the UI.
 function forwattStats() {
   let totalMeters = 0, coveredMeters = 0, totalSmart = 0, coveredSmart = 0;
@@ -289,13 +296,13 @@ function renderForwattSummary() {
   const s = forwattStats();
   const wmsb = state.coverage.partners.filter(p => !p.vnbId).length;
   document.getElementById('forwatt-summary').innerHTML = `
-    <div class="fw-sum-head">Deutschlandweite for.watt-Abdeckung*</div>
+    <div class="fw-sum-head">Deutschlandweite for.Watt-Abdeckung*</div>
     <div class="fw-sum-grid">
       <div><b>${pct(s.meterPct)}</b><span>der Zählpunkte<br>${fmtK(s.coveredMeters)} / ${fmtK(s.totalMeters)}</span></div>
       <div><b>${pct(s.smartPct)}</b><span>der Smart Meter<br>${fmtK(s.coveredSmart)} / ${fmtK(s.totalSmart)}</span></div>
     </div>
     <div class="fw-wmsb-note">+ ${wmsb} wMSB — bundesweit tätig, nicht in den Zahlen enthalten</div>
-    <div class="fw-foot">* nur über grundzuständige Netzgebiete (gMSB). Wettbewerbliche MSB (wMSB) sind bundesweit tätig und keinem Netzgebiet zugeordnet; die tatsächliche for.watt-Reichweite liegt daher höher.</div>`;
+    <div class="fw-foot">* nur über grundzuständige Netzgebiete (gMSB). Wettbewerbliche MSB (wMSB) sind bundesweit tätig und keinem Netzgebiet zugeordnet; die tatsächliche for.Watt-Reichweite liegt daher höher.</div>`;
 }
 
 function renderForwattList() {

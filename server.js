@@ -1,5 +1,5 @@
 // Minimal zero-dep static server for local preview. GitHub Pages serves these
-// same files directly; the for.watt coverage is a static data/forwatt-coverage.json
+// same files directly; the for.Watt coverage is a static data/forwatt-coverage.json
 // kept fresh by .github/workflows/update-coverage.yml.
 const http = require('http');
 const fs = require('fs');

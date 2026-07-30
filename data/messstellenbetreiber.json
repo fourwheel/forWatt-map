@@ -1,5 +1,5 @@
 {
-  "source": "for.watt unterstützte Messstellenbetreiber – manuell gepflegt",
+  "source": "for.Watt unterstützte Messstellenbetreiber – manuell gepflegt",
   "updated": "2026-07-30",
   "note": "Diese Liste ist die Datenquelle für das Overlay. Zum Aktualisieren einfach Einträge in 'operators' ergänzen/entfernen und committen. 'aliases' erzwingt bei Bedarf eine bestimmte VNB-Zuordnung (Name des MSB -> exakter VNB-Name im Datensatz).",
   "operators": [
