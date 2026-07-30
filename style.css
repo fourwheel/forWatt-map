@@ -23,11 +23,10 @@ body {
 .sidebar {
   width: 430px; flex-shrink: 0; background: var(--panel);
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
-  overflow: hidden; transition: margin-left .3s ease, opacity .3s ease;
+  overflow-y: auto; transition: margin-left .3s ease, opacity .3s ease;
   box-shadow: 2px 0 12px rgba(0,0,0,.04);
 }
 .sidebar.collapsed { margin-left: -430px; opacity: 0; pointer-events: none; }
-.sidebar-scroll { flex: 1; overflow-y: auto; min-height: 0; }
 
 .sidebar-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
 .fw-logo { height: 28px; width: auto; display: block; }
@@ -130,7 +129,7 @@ body {
 .vnb-row .fwtag { color: var(--accent); font-size: .82rem; }
 
 /* credit footer */
-.credit { font-size: .7rem; color: var(--muted); line-height: 1.5; border-bottom: none; border-top: 1px solid var(--border); flex-shrink: 0; }
+.credit { font-size: .7rem; color: var(--muted); line-height: 1.5; border-bottom: none; flex-shrink: 0; }
 .credit a { color: var(--accent); text-decoration: none; font-weight: 500; }
 .credit a:hover { text-decoration: underline; }
 
