@@ -314,8 +314,7 @@ function renderForwattList() {
     <div class="fw-item matched" data-id="${p.vnbId}">
       <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.vnbName)}</span><span class="where">${esc(p.city || '')}</span></div>
       <div class="fw-metrics">
-        <span title="Smart-Meter-Quote (mit opt. Einbaufällen)">${pct(smMit(p.vnbId))} Quote</span>
-        <span title="Anzahl Smart Meter">${fmtK(smartMeters(p.vnbId))} Smart Meter</span>
+        <span title="Smart-Meter-Quote (mit opt. Einbaufällen)">${pct(smMit(p.vnbId))} Pflichteinbaufälle mit iMSys</span>
         <span title="Zählpunkte gesamt">${fmtK(mcValue(p.vnbId))} Zähler</span>
       </div>
     </div>`;
