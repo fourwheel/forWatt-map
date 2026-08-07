@@ -69,9 +69,9 @@ function tooltipHtml(f) {
   return `<div class="vnb-tt">
     <h3>${esc(p.name)}</h3>
     <div class="c">${esc(p.city || '')} · ${(p.types || []).length} Spannungsebenen</div>
-    <div class="kv"><span>Smart-Meter-Quote</span><b>${sm != null ? (sm * 100).toFixed(1) + ' %' : 'k. A.'}</b></div>
+    <div class="kv"><span>Smart Meter (Pflichteinbaufälle)</span><b>${sm != null ? (sm * 100).toFixed(1) + ' %' : 'k. A.'}</b></div>
     <div class="kv"><span>Zähler</span><b>${mc != null ? mc.toLocaleString('de-DE') : 'k. A.'}</b></div>
-    ${cov ? `<div class="fw">● for.Watt-Abdeckung${partner ? ' · ' + esc(partner.name) : ''}</div>` : ''}
+    ${cov ? `<div class="fw">✓ Abgedeckt durch for.Watt</div>` : ''}
   </div>`;
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -266,7 +266,7 @@ async function loadForwatt() {
     state.matched = new Set(cov.matchedVnbIds);
     status.className = 'forwatt-status ok';
     status.textContent = `${cov.matchedVnbIds.length} von ${cov.partners.length} Messstellenbetreiber auf VNB-Gebiete abgebildet`;
-    renderForwattSummary();
+    // renderForwattSummary(); // Kachel "Deutschlandweite for.Watt-Abdeckung*" ausgeblendet, bei Bedarf wieder aktivieren.
     renderForwattList();
     renderList();
     restyle();
@@ -312,7 +312,7 @@ function renderForwattList() {
   const other = parts.filter(p => !p.vnbId).sort((a, b) => a.name.localeCompare(b.name));
   const matchedItem = p => `
     <div class="fw-item matched" data-id="${p.vnbId}">
-      <div class="fw-row1"><span class="dot"></span><span class="who">${esc(p.vnbName)}</span><span class="where">${esc(p.city || '')}</span></div>
+      <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.vnbName)}</span><span class="where">${esc(p.city || '')}</span></div>
       <div class="fw-metrics">
         <span title="Smart-Meter-Quote (mit opt. Einbaufällen)">${pct(smMit(p.vnbId))} Quote</span>
         <span title="Anzahl Smart Meter">${fmtK(smartMeters(p.vnbId))} Smart Meter</span>
@@ -321,7 +321,7 @@ function renderForwattList() {
     </div>`;
   const otherItem = p => `
     <div class="fw-item unmatched">
-      <div class="fw-row1"><span class="dot"></span><span class="who">${esc(p.name)}</span><span class="where">wMSB</span></div>
+      <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.name)}</span><span class="where">wMSB</span></div>
     </div>`;
   el.innerHTML =
     `<div class="fw-group">Grundzuständige MSB · mit Netzgebiet · ${matched.length}</div>` +
