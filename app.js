@@ -9,6 +9,7 @@ const state = {
   coverage: null,        // { partners, matchedVnbIds }
   matched: new Set(),
   selected: null,
+  hovered: null,         // vnb_id currently under the cursor
 };
 
 let map, geoLayer, dsoById = {}, dsoList = [], smData = {}, meterCounts = {}, layersByVnb = {};
@@ -57,7 +58,19 @@ function styleFor(feature) {
   if (state.selected === id) return { fillColor: fill, weight: 3, color: '#1D1D1D', opacity: 1, fillOpacity: .9 };
   return { fillColor: fill, weight: 1, color: '#ffffff', opacity: .8, fillOpacity: smValue(id) != null || mcValue(id) != null ? .72 : .3 };
 }
-function restyle() { if (geoLayer) geoLayer.setStyle(styleFor); }
+// hover: keep the region's own colours; lean on a fill lift so the territory
+// reads as one solid block, with just a thin outline on top
+function hoverStyleFor(feature) {
+  const base = styleFor(feature);
+  return { ...base, weight: 1.6, color: '#1D1D1D', opacity: .9, dashArray: null,
+    fillOpacity: Math.min(Math.max(base.fillOpacity, .5) + .22, .95) };
+}
+function restyle() {
+  if (!geoLayer) return;
+  geoLayer.setStyle(styleFor);
+  const layer = state.hovered != null && layersByVnb[state.hovered];
+  if (layer) layer.setStyle(hoverStyleFor(layer.feature));
+}
 
 // ---------- tooltip ----------
 function tooltipHtml(f) {
@@ -108,6 +121,15 @@ async function init() {
       layersByVnb[id] = layer;
       layer.bindTooltip(() => tooltipHtml(f), { className: 'vnb-tt', sticky: true, direction: 'top' });
       layer.on('click', () => { state.selected = id; restyle(); });
+      layer.on('mouseover', () => {
+        state.hovered = id;
+        layer.setStyle(hoverStyleFor(f));
+        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) layer.bringToFront();
+      });
+      layer.on('mouseout', () => {
+        if (state.hovered === id) state.hovered = null;
+        layer.setStyle(styleFor(f));
+      });
     },
   }).addTo(map);
 

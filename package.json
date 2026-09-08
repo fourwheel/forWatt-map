@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/check-coverage.cjs",
-    "update-data": "node scripts/update-data.cjs"
+    "update-data": "node scripts/update-data.cjs",
+    "clean-geo": "node scripts/clean-geo.cjs"
   }
 }

@@ -9,6 +9,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { clean } = require('./clean-geo.cjs');
 
 const XK = Buffer.from([118,110,98,50,48,50,53,100,115,111]); // "vnb2025dso"
 const GM = {T:'type',F:'features',G:'geometry',C:'coordinates',P:'properties',FC:'FeatureCollection',FT:'Feature',PG:'Polygon',MP:'MultiPolygon',v:'vnb_id',n:'name',c:'city',cl:'color',t:'types'};
@@ -42,9 +43,10 @@ const get = url => new Promise((resolve, reject) => {
   const [g, d, s] = await Promise.all([get(base + '/g'), get(base + '/d'), get(base + '/s')]);
   const geo = decode(g, GM), dso = decode(d, DM), sm = decode(s, SM);
   if (!geo.features?.length || !dso.length || !sm.periods?.length) throw new Error('decoded data looks empty — aborting');
+  const g0 = clean(geo);  // strip sliver/spike polygons, simplify the postal-code-grid geometry
   fs.writeFileSync(path.join(dir, 'geo.json'), JSON.stringify(geo));
   fs.writeFileSync(path.join(dir, 'dso.json'), JSON.stringify(dso));
   fs.writeFileSync(path.join(dir, 'sm.json'), JSON.stringify(sm));
   const p = sm.periods[sm.periods.length - 1];
-  console.log(`updated: ${dso.length} VNB · ${geo.features.length} territories · period ${p.label} (${p.date})`);
+  console.log(`updated: ${dso.length} VNB · ${geo.features.length} territories (rings ${g0.ringsIn}→${g0.ringsOut}, verts ${g0.vertsIn}→${g0.vertsOut}) · period ${p.label} (${p.date})`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });
