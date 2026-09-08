@@ -92,9 +92,14 @@ async function init() {
   for (const [k, v] of Object.entries(sm.meter_counts || {})) meterCounts[k] = typeof v === 'object' ? v.total : v;
 
   map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([51.2, 10.4], 6);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19,
-  }).addTo(map);
+  L.tileLayer(
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }
+  ).addTo(map);
+
 
   geoLayer = L.geoJSON(geo, {
     style: styleFor,
