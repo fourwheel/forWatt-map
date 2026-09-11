@@ -19,23 +19,15 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const https = require('https');
 const { openRemoteZip } = require('./lib/mastr-zip.cjs');
 const { simplifyGeometry } = require('./lib/simplify.cjs');
-const MsbMatch = require('../lib/match.js');
+const { scanMastr, log, cachePath } = require('./lib/mastr-scan.cjs');
 
 // VG250 is generalised for 1:250 000 already; this thins Gemeinde rings further
 // for a country-wide choropleth (~0.0012deg ~= 80-130m at German latitudes).
 const SIMPLIFY_TOLERANCE_DEG = 0.0012;
 const COORD_DECIMALS = 4;
-
-const CACHE_DIR = path.join(os.tmpdir(), 'forwatt-mastr-cache');
-fs.mkdirSync(CACHE_DIR, { recursive: true });
-const cachePath = name => path.join(CACHE_DIR, name);
-
-const log = (...a) => console.error(new Date().toISOString().slice(11, 19), ...a);
-const mem = () => `${Math.round(process.memoryUsage().rss / 1e6)}MB`;
 
 function fetchText(url) {
   return new Promise((resolve, reject) => {
@@ -50,35 +42,7 @@ function fetchText(url) {
   });
 }
 
-// ---------- generic flat-XML record scanning ----------
-function* iterRecords(xml, tag) {
-  const open = `<${tag}>`, close = `</${tag}>`;
-  let i = 0;
-  while (true) {
-    const start = xml.indexOf(open, i);
-    if (start === -1) break;
-    const end = xml.indexOf(close, start + open.length);
-    if (end === -1) break;
-    yield xml.slice(start + open.length, end);
-    i = end + close.length;
-  }
-}
-function field(rec, name) {
-  const open = `<${name}>`;
-  const i = rec.indexOf(open);
-  if (i === -1) return null;
-  const j = rec.indexOf('<', i + open.length);
-  return rec.slice(i + open.length, j);
-}
-// MaStR-Nummern are TYPE + digits (e.g. "SAN921662892546"); within one table the
-// type is constant, so the digit part alone is a safe, cheap numeric map key.
-function idNum(s) {
-  if (!s) return null;
-  const m = /(\d+)\s*$/.exec(s);
-  return m ? Number(m[1]) : null;
-}
-
-// ---------- 1. VG250 Gemeinde boundaries (BKG WFS, public, dl-de/by-2-0) ----------
+// ---------- VG250 Gemeinde boundaries (BKG WFS, public, dl-de/by-2-0) ----------
 async function fetchGemeindenBoundaries() {
   const file = cachePath('vg250_gem.json');
   if (fs.existsSync(file)) { log('vg250: cache hit'); return JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -109,7 +73,6 @@ function simplifyBoundaries(gemeinden) {
   return out;
 }
 
-// ---------- 2. MaStR: Gemeinde -> Netzbetreiber votes ----------
 async function getLatestExportUrl() {
   const html = await fetchText('https://www.marktstammdatenregister.de/MaStR/Datendownload');
   const m = html.match(/https:\/\/download\.marktstammdatenregister\.de\/Gesamtdatenexport_\d+_[\d.]+\.zip/);
@@ -117,166 +80,73 @@ async function getLatestExportUrl() {
   return m[0];
 }
 
-const EINHEIT_TABLES = [
-  { tag: 'EinheitSolar', match: /^EinheitenSolar_\d+\.xml$/ },
-  { tag: 'EinheitWind', match: /^EinheitenWind\.xml$/ },
-  { tag: 'EinheitBiomasse', match: /^EinheitenBiomasse\.xml$/ },
-  { tag: 'EinheitWasser', match: /^EinheitenWasser\.xml$/ },
-];
-
-async function buildGemeindeVotes(zip) {
-  const votesFile = cachePath('gemeinde_votes.json');
-  const namesFile = cachePath('netzbetreiber_names.json');
-  if (fs.existsSync(votesFile) && fs.existsSync(namesFile)) {
-    log('mastr votes: cache hit');
-    return {
-      votes: new Map(Object.entries(JSON.parse(fs.readFileSync(votesFile, 'utf8')))
-        .map(([g, m]) => [g, new Map(Object.entries(m).map(([k, v]) => [Number(k), v]))])),
-      names: JSON.parse(fs.readFileSync(namesFile, 'utf8')),
-    };
-  }
-
-  // --- pass 1: Einheiten -> lokationId -> gemeindeschluessel ---
-  const lokationToGemeinde = new Map();
-  let unitCount = 0;
-  // MASTR_SOLAR_LIMIT caps how many EinheitenSolar_*.xml shards are read — for a
-  // quick smoke test of the whole pipeline before committing to the full ~1GB pull.
-  const solarLimit = process.env.MASTR_SOLAR_LIMIT ? Number(process.env.MASTR_SOLAR_LIMIT) : Infinity;
-  for (const { tag, match } of EINHEIT_TABLES) {
-    let shards = [...zip.entries.keys()].filter(n => match.test(n)).sort();
-    if (tag === 'EinheitSolar') shards = shards.slice(0, solarLimit);
-    for (const shard of shards) {
-      const xml = await zip.readEntry(shard);
-      let n = 0;
-      for (const rec of iterRecords(xml, tag)) {
-        const lok = idNum(field(rec, 'LokationMaStRNummer'));
-        const gk = field(rec, 'Gemeindeschluessel');
-        if (lok != null && gk) { lokationToGemeinde.set(lok, gk); n++; }
-      }
-      unitCount += n;
-      log(`einheiten: ${shard} (+${n}, total ${unitCount}, lokationen ${lokationToGemeinde.size}) ${mem()}`);
-    }
-  }
-
-  // --- pass 2: Lokationen -> napId -> gemeindeschluessel (filtered, freeing as we go) ---
-  const napToGemeinde = new Map();
-  const lokShards = [...zip.entries.keys()].filter(n => /^Lokationen_\d+\.xml$/.test(n)).sort();
-  for (const shard of lokShards) {
-    const xml = await zip.readEntry(shard);
-    let n = 0;
-    for (const rec of iterRecords(xml, 'Lokation')) {
-      const id = idNum(field(rec, 'MastrNummer'));
-      if (id == null || !lokationToGemeinde.has(id)) continue;
-      const gk = lokationToGemeinde.get(id);
-      lokationToGemeinde.delete(id);
-      const napField = field(rec, 'NetzanschlusspunkteMaStRNummern');
-      const nap = idNum(napField && napField.split(',')[0]);
-      if (nap != null) { napToGemeinde.set(nap, gk); n++; }
-    }
-    log(`lokationen: ${shard} (+${n}, naps ${napToGemeinde.size}, remaining lokationen ${lokationToGemeinde.size}) ${mem()}`);
-  }
-  lokationToGemeinde.clear();
-
-  // --- pass 3: Netzanschlusspunkte -> tally votes per gemeinde+netzbetreiber ---
-  const votes = new Map(); // gemeindeschluessel -> Map(netzbetreiberId -> count)
-  const netzbetreiberIds = new Set();
-  const napShards = [...zip.entries.keys()].filter(n => /^Netzanschlusspunkte_\d+\.xml$/.test(n)).sort();
-  for (const shard of napShards) {
-    const xml = await zip.readEntry(shard);
-    let n = 0;
-    for (const rec of iterRecords(xml, 'Netzanschlusspunkt')) {
-      const id = idNum(field(rec, 'NetzanschlusspunktMastrNummer'));
-      if (id == null || !napToGemeinde.has(id)) continue;
-      const gk = napToGemeinde.get(id);
-      napToGemeinde.delete(id);
-      const nb = idNum(field(rec, 'NetzbetreiberMaStRNummer'));
-      if (nb == null) continue;
-      netzbetreiberIds.add(nb);
-      let m = votes.get(gk); if (!m) votes.set(gk, m = new Map());
-      m.set(nb, (m.get(nb) || 0) + 1);
-      n++;
-    }
-    log(`netzanschlusspunkte: ${shard} (+${n}, gemeinden with votes ${votes.size}) ${mem()}`);
-  }
-  napToGemeinde.clear();
-
-  // --- pass 4: Marktakteure -> netzbetreiberId -> Firmenname (only wanted ids) ---
-  const names = {};
-  const maShards = [...zip.entries.keys()].filter(n => /^Marktakteure_\d+\.xml$/.test(n)).sort();
-  let remaining = new Set(netzbetreiberIds);
-  for (const shard of maShards) {
-    if (!remaining.size) break;
-    const xml = await zip.readEntry(shard);
-    let n = 0;
-    for (const rec of iterRecords(xml, 'Marktakteur')) {
-      const id = idNum(field(rec, 'MastrNummer'));
-      if (id == null || !remaining.has(id)) continue;
-      names[id] = field(rec, 'Firmenname');
-      remaining.delete(id);
-      n++;
-    }
-    log(`marktakteure: ${shard} (+${n}, still missing ${remaining.size}) ${mem()}`);
-  }
-
-  fs.writeFileSync(votesFile, JSON.stringify(Object.fromEntries(
-    [...votes].map(([g, m]) => [g, Object.fromEntries(m)]))));
-  fs.writeFileSync(namesFile, JSON.stringify(names));
-  return { votes, names };
+function bboxOf(geometry) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const walk = coords => {
+    if (typeof coords[0] === 'number') {
+      const [x, y] = coords;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    } else coords.forEach(walk);
+  };
+  walk(geometry.coordinates);
+  return [minX, minY, maxX, maxY];
 }
 
-// ---------- 3. merge: majority operator per Gemeinde, matched to dso.json ----------
-function main() {
-  return (async () => {
-    const dsoPath = path.join(__dirname, '..', 'data', 'dso.json');
+async function main() {
+  const [gemeindenRaw, exportUrl] = await Promise.all([
+    fetchGemeindenBoundaries(),
+    getLatestExportUrl(),
+  ]);
+  const gemeinden = simplifyBoundaries(gemeindenRaw);
+  log('using export', exportUrl);
+  const zip = await openRemoteZip(exportUrl);
+  log('zip opened,', zip.entries.size, 'entries,', Math.round(zip.size / 1e9 * 100) / 100, 'GB');
+
+  const { votes, netzbetreiber } = await scanMastr(zip);
+
+  const gemeindeToVnb = new Map(); // gemeindeschluessel -> vnb_id (string)
+  for (const [gk, opCounts] of votes) {
+    let bestId = null, bestCount = -1;
+    for (const [opId, c] of opCounts) if (c > bestCount) { bestCount = c; bestId = opId; }
+    if (netzbetreiber.has(bestId)) gemeindeToVnb.set(gk, String(bestId));
+  }
+  log(`gemeinden with a resolvable VNB: ${gemeindeToVnb.size} / ${votes.size}`);
+
+  const bboxByVnb = new Map();
+  const features = [];
+  for (const f of gemeinden) {
+    const ags = f.properties.ags;
+    const vnbId = gemeindeToVnb.get(ags);
+    if (!vnbId) continue; // no MaStR-derived data for this Gemeinde — leave it out rather than guess
+    const op = netzbetreiber.get(Number(vnbId));
+    features.push({
+      type: 'Feature',
+      properties: { vnb_id: vnbId, name: op.name, city: op.city, types: op.types, ags, gemeinde: f.properties.gen },
+      geometry: f.geometry,
+    });
+    const [minX, minY, maxX, maxY] = bboxOf(f.geometry);
+    const b = bboxByVnb.get(vnbId);
+    bboxByVnb.set(vnbId, b
+      ? [Math.min(b[0], minX), Math.min(b[1], minY), Math.max(b[2], maxX), Math.max(b[3], maxY)]
+      : [minX, minY, maxX, maxY]);
+  }
+  const geo = { type: 'FeatureCollection', features };
+  const dataDir = path.join(__dirname, '..', 'data');
+  fs.writeFileSync(path.join(dataDir, 'geo.json'), JSON.stringify(geo));
+  log(`wrote data/geo.json: ${features.length} Gemeinde-Kacheln across ${new Set(features.map(f => f.properties.vnb_id)).size} VNB`);
+
+  // patch bbox into dso.json, if it exists (run scripts/build-dso.cjs first)
+  const dsoPath = path.join(dataDir, 'dso.json');
+  if (fs.existsSync(dsoPath)) {
     const dso = JSON.parse(fs.readFileSync(dsoPath, 'utf8'));
-
-    const [gemeindenRaw, exportUrl] = await Promise.all([
-      fetchGemeindenBoundaries(),
-      getLatestExportUrl(),
-    ]);
-    const gemeinden = simplifyBoundaries(gemeindenRaw);
-    log('using export', exportUrl);
-    const zip = await openRemoteZip(exportUrl);
-    log('zip opened,', zip.entries.size, 'entries,', Math.round(zip.size / 1e9 * 100) / 100, 'GB');
-
-    const { votes, names } = await buildGemeindeVotes(zip);
-
-    // match every distinct MaStR Netzbetreiber name to a dso.json VNB, once
-    const distinctNames = [...new Set(Object.values(names))];
-    const resolved = MsbMatch.resolve(distinctNames, dso);
-    const nameToVnbId = new Map(resolved.partners.filter(p => p.vnbId).map(p => [p.name, p.vnbId]));
-
-    let matched = 0, unmatched = 0;
-    const gemeindeToVnb = new Map(); // gemeindeschluessel -> vnb_id
-    for (const [gk, opCounts] of votes) {
-      let bestId = null, bestCount = -1;
-      for (const [opId, c] of opCounts) if (c > bestCount) { bestCount = c; bestId = opId; }
-      const name = names[bestId];
-      const vnbId = name && nameToVnbId.get(name);
-      if (vnbId) { gemeindeToVnb.set(gk, vnbId); matched++; } else unmatched++;
-    }
-    log(`gemeinden matched to a VNB: ${matched}, unmatched (dropped): ${unmatched}`);
-
-    const dsoById = new Map(dso.map(d => [d.id, d]));
-    const features = [];
-    for (const f of gemeinden) {
-      const ags = f.properties.ags;
-      const vnbId = gemeindeToVnb.get(ags);
-      if (!vnbId) continue; // no MaStR-derived data for this Gemeinde — leave it out rather than guess
-      const d = dsoById.get(vnbId);
-      features.push({
-        type: 'Feature',
-        properties: {
-          vnb_id: vnbId, name: d.name, city: d.city, color: d.color, types: d.types,
-          ags, gemeinde: f.properties.gen,
-        },
-        geometry: f.geometry,
-      });
-    }
-    const geo = { type: 'FeatureCollection', features };
-    fs.writeFileSync(path.join(__dirname, '..', 'data', 'geo.json'), JSON.stringify(geo));
-    log(`wrote data/geo.json: ${features.length} Gemeinde-Kacheln across ${new Set(features.map(f => f.properties.vnb_id)).size} VNB`);
-  })();
+    let patched = 0;
+    for (const d of dso) { const b = bboxByVnb.get(d.id); if (b) { d.bbox = b; patched++; } }
+    fs.writeFileSync(dsoPath, JSON.stringify(dso));
+    log(`patched bbox into data/dso.json for ${patched} / ${dso.length} Netzbetreiber`);
+  } else {
+    log('data/dso.json not found — skipping bbox patch (run scripts/build-dso.cjs first)');
+  }
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(1); });
