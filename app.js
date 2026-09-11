@@ -68,8 +68,8 @@ function hoverStyleFor(feature) {
 function restyle() {
   if (!geoLayer) return;
   geoLayer.setStyle(styleFor);
-  const layer = state.hovered != null && layersByVnb[state.hovered];
-  if (layer) layer.setStyle(hoverStyleFor(layer.feature));
+  const layers = state.hovered != null ? layersByVnb[state.hovered] : null;
+  if (layers) layers.forEach(layer => layer.setStyle(hoverStyleFor(layer.feature)));
 }
 
 // ---------- tooltip ----------
@@ -118,17 +118,19 @@ async function init() {
     style: styleFor,
     onEachFeature: (f, layer) => {
       const id = f.properties.vnb_id;
-      layersByVnb[id] = layer;
+      (layersByVnb[id] || (layersByVnb[id] = [])).push(layer);
       layer.bindTooltip(() => tooltipHtml(f), { className: 'vnb-tt', sticky: true, direction: 'top' });
       layer.on('click', () => { state.selected = id; restyle(); });
       layer.on('mouseover', () => {
         state.hovered = id;
-        layer.setStyle(hoverStyleFor(f));
-        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) layer.bringToFront();
+        layersByVnb[id].forEach(l => {
+          l.setStyle(hoverStyleFor(l.feature));
+          if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) l.bringToFront();
+        });
       });
       layer.on('mouseout', () => {
         if (state.hovered === id) state.hovered = null;
-        layer.setStyle(styleFor(f));
+        layersByVnb[id].forEach(l => l.setStyle(styleFor(l.feature)));
       });
     },
   }).addTo(map);
@@ -277,8 +279,8 @@ function focusVnb(id) {
   state.selected = id; restyle();
   const d = dsoById[id];
   if (d && d.bbox) map.fitBounds([[d.bbox[1], d.bbox[0]], [d.bbox[3], d.bbox[2]]], { maxZoom: 10, padding: [40, 40] });
-  const layer = layersByVnb[id];
-  if (layer) layer.openTooltip();
+  const layers = layersByVnb[id];
+  if (layers && layers.length) layers[0].openTooltip();
 }
 
 // ---------- for.Watt coverage (from the maintained list, resolved on each load) ----------

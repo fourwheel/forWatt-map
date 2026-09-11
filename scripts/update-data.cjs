@@ -1,18 +1,21 @@
 // Refresh the VNB / smart-meter snapshot from vnb-monitoring.org.
-// Run: npm run update-data   (then commit data/*.json)
+// Run: npm run update-data   (then commit data/dso.json data/sm.json)
 //
 // vnb-monitoring serves the public Bundesnetzagentur figures obfuscated as
 // base64( xor( gzip( json ) ) ) with short keys. We reverse that and expand the
-// keys to the same plain JSON the app reads (data/geo.json, dso.json, sm.json).
+// keys to the same plain JSON the app reads (data/dso.json, data/sm.json).
+//
+// data/geo.json is NOT touched here — its territory shapes used to come from
+// vnb-monitoring too, but that geometry's own origin/licence was undocumented.
+// It's now built independently from public sources (BKG VG250 + the
+// Marktstammdatenregister); regenerate it with `npm run build-geo` instead.
 'use strict';
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { clean } = require('./clean-geo.cjs');
 
 const XK = Buffer.from([118,110,98,50,48,50,53,100,115,111]); // "vnb2025dso"
-const GM = {T:'type',F:'features',G:'geometry',C:'coordinates',P:'properties',FC:'FeatureCollection',FT:'Feature',PG:'Polygon',MP:'MultiPolygon',v:'vnb_id',n:'name',c:'city',cl:'color',t:'types'};
 const DM = {i:'id',n:'name',c:'city',t:'types',cl:'color',b:'bbox',f:'features'};
 const SM = {p:'periods',l:'label',d:'date',dt:'data',o:'ohne',m:'mit',mc:'meter_counts',tt:'total',h:'hs',ms:'ms',ns:'ns'};
 
@@ -40,13 +43,12 @@ const get = url => new Promise((resolve, reject) => {
 (async () => {
   const dir = path.join(__dirname, '..', 'data');
   const base = 'https://vnb-monitoring.org/api';
-  const [g, d, s] = await Promise.all([get(base + '/g'), get(base + '/d'), get(base + '/s')]);
-  const geo = decode(g, GM), dso = decode(d, DM), sm = decode(s, SM);
-  if (!geo.features?.length || !dso.length || !sm.periods?.length) throw new Error('decoded data looks empty — aborting');
-  const g0 = clean(geo);  // strip sliver/spike polygons, simplify the postal-code-grid geometry
-  fs.writeFileSync(path.join(dir, 'geo.json'), JSON.stringify(geo));
+  const [d, s] = await Promise.all([get(base + '/d'), get(base + '/s')]);
+  const dso = decode(d, DM), sm = decode(s, SM);
+  if (!dso.length || !sm.periods?.length) throw new Error('decoded data looks empty — aborting');
   fs.writeFileSync(path.join(dir, 'dso.json'), JSON.stringify(dso));
   fs.writeFileSync(path.join(dir, 'sm.json'), JSON.stringify(sm));
   const p = sm.periods[sm.periods.length - 1];
-  console.log(`updated: ${dso.length} VNB · ${geo.features.length} territories (rings ${g0.ringsIn}→${g0.ringsOut}, verts ${g0.vertsIn}→${g0.vertsOut}) · period ${p.label} (${p.date})`);
+  console.log(`updated: ${dso.length} VNB · period ${p.label} (${p.date}). ` +
+    `Note: data/geo.json is separate now — run "npm run build-geo" if VNB names/ids changed enough to need it re-matched.`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });
