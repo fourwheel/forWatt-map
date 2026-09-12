@@ -110,7 +110,10 @@ there (mostly EEG/PV installations, present in nearly every municipality). A han
 partners with a narrow, non-residential grid (e.g. an industrial park's own Netzbetreiber, or a
 transmission operator with no Gemeinde-level footprint) will therefore not appear on the map even
 though they're correctly matched in the sidebar list — there's just no Gemeinde where they hold
-the majority of registered units.
+the majority of registered units. This isn't recoverable by re-running the scripts or tweaking
+the matcher: it's structural to the per-Gemeinde-winner-takes-all method (currently 6 of 48
+matched partners, e.g. GETEC net GmbH, 50Hertz Transmission GmbH). The sidebar flags these rows
+as "nicht kartiert" instead of a city, and doesn't style them as clickable.
 
 To regenerate it (run `npm run build-dso` first — see above):
 
