@@ -75,12 +75,12 @@ body {
 .fw-wmsb-note { font-size: .72rem; font-weight: 600; color: #8a6d00; background: var(--accent-2); border-radius: 6px; padding: 4px 8px; margin-top: 10px; }
 .fw-foot { font-size: .64rem; color: var(--muted); margin-top: 8px; opacity: .85; }
 
-.forwatt-list { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-height: 40px; overflow-y: auto; }
-/* wMSB heading stays put between the two lists (not part of either scroll area),
-   so it's always visible even before the user scrolls down to it */
-.fw-group-fixed { flex: 0 0 auto; margin-top: 10px; }
-.forwatt-list-wmsb { flex: 0 1 140px; min-height: 40px; }
-.fw-group { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 10px 0 3px; font-weight: 600; }
+.forwatt-list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
+.fw-group {
+  position: sticky; top: 0; z-index: 1; background: var(--panel);
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  margin: 10px 0 3px; padding: 4px 0 2px; font-weight: 600;
+}
 .fw-group:first-child { margin-top: 0; }
 .fw-item { display: flex; flex-direction: column; gap: 3px; font-size: .76rem; padding: 6px 6px; border-radius: 8px; cursor: default; }
 .fw-row1 { display: flex; align-items: center; gap: 8px; }

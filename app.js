@@ -279,8 +279,6 @@ async function loadForwatt() {
 }
 function renderForwattList() {
   const el = document.getElementById('forwatt-list');
-  const heading = document.getElementById('forwatt-wmsb-heading');
-  const wmsbEl = document.getElementById('forwatt-wmsb-list');
   const parts = state.coverage.partners;
   const matched = parts.filter(p => p.vnbId).sort((a, b) => (smMit(b.vnbId) ?? -1) - (smMit(a.vnbId) ?? -1));
   const other = parts.filter(p => !p.vnbId).sort((a, b) => a.name.localeCompare(b.name));
@@ -295,13 +293,13 @@ function renderForwattList() {
     <div class="fw-item unmatched">
       <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.name)}</span><span class="where">wMSB</span></div>
     </div>`;
+  // one scrolling list; the group headings are sticky so "wMSB" stays visible
+  // once you scroll to it, while its items only appear as you scroll further
   el.innerHTML =
     `<div class="fw-group">Grundzuständige MSB · mit Netzgebiet · ${matched.length}</div>` +
-    matched.map(matchedItem).join('');
-  // heading sits outside both lists so it stays visible even before the wMSB
-  // list itself (below it) is scrolled into view
-  heading.textContent = `Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}`;
-  wmsbEl.innerHTML = other.map(otherItem).join('');
+    matched.map(matchedItem).join('') +
+    `<div class="fw-group">Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}</div>` +
+    other.map(otherItem).join('');
   el.querySelectorAll('.fw-item.matched').forEach(it => it.onclick = () => focusVnb(it.dataset.id));
 }
 
