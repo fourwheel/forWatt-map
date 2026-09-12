@@ -17,8 +17,8 @@ body {
   color: var(--muted); font-size: 1rem;
 }
 
-.main { display: flex; height: 100vh; }
-#map { flex: 1; background: #E8EAED; }
+.main { display: flex; height: 100vh; height: 100dvh; }
+#map { flex: 1; background: #E8EAED; min-width: 0; }
 
 .sidebar {
   width: 430px; flex-shrink: 0; background: var(--panel);
@@ -140,6 +140,46 @@ body {
   transition: left .3s ease; box-shadow: 2px 0 8px rgba(0,0,0,.06);
 }
 .sidebar-toggle.collapsed { left: 0; }
+
+/* sidebar backdrop (mobile only) */
+.sidebar-backdrop { display: none; }
+
+/* ---------- responsive: mobile ---------- */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 1500;
+    width: min(88vw, 360px); height: 100vh; height: 100dvh;
+    margin-left: 0; transform: translateX(0);
+    transition: transform .3s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.2);
+  }
+  .sidebar.collapsed {
+    margin-left: 0; opacity: 1; transform: translateX(-100%);
+  }
+
+  .sidebar-toggle {
+    position: fixed; left: 12px; top: 12px; transform: none;
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; z-index: 1600;
+  }
+  .sidebar-toggle.collapsed { left: 12px; }
+
+  .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    z-index: 1400; opacity: 0; pointer-events: none; transition: opacity .3s ease;
+  }
+  .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+  /* keep Leaflet's zoom control clear of the floating toggle button */
+  .leaflet-top.leaflet-left { top: 64px; }
+
+  .sidebar-head { padding: 16px 16px 12px; }
+  .panel { padding: 12px 16px; }
+  .credit { font-size: .68rem; }
+
+  .leaflet-tooltip.vnb-tt { max-width: 78vw; }
+}
 
 /* leaflet tooltip */
 .leaflet-tooltip.vnb-tt {
