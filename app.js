@@ -12,6 +12,19 @@ const state = {
 
 let map, geoLayer, dsoById = {}, dsoList = [], smData = {}, layersByVnb = {};
 
+// ---------- sidebar (mobile overlay) ----------
+const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+function setSidebarOpen(open) {
+  const sidebarEl = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  sidebarEl.classList.toggle('collapsed', !open);
+  toggleBtn.classList.toggle('collapsed', !open);
+  toggleBtn.textContent = open ? '◀' : '▶';
+  if (backdrop) backdrop.classList.toggle('visible', open && isMobile());
+  if (map) setTimeout(() => map.invalidateSize(), 320);
+}
+
 // ---------- color scale ----------
 function smColor(r) {
   if (r == null) return '#475569';
@@ -139,12 +152,13 @@ function wireControls() {
   //   restyle();
   // };
 
-  document.getElementById('sidebar-toggle').onclick = e => {
-    document.getElementById('sidebar').classList.toggle('collapsed');
-    e.target.classList.toggle('collapsed');
-    e.target.textContent = e.target.classList.contains('collapsed') ? '▶' : '◀';
-    setTimeout(() => map.invalidateSize(), 320);
-  };
+  const sidebarEl = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  toggleBtn.onclick = () => setSidebarOpen(sidebarEl.classList.contains('collapsed'));
+  if (backdrop) backdrop.onclick = () => setSidebarOpen(false);
+  // start with the map in view on phones; the sidebar opens as an overlay on demand
+  if (isMobile()) setSidebarOpen(false);
 
   // Filter-Panel (inkl. #reset-btn) ist im HTML auskommentiert.
   const resetBtn = document.getElementById('reset-btn');
@@ -240,6 +254,7 @@ function focusVnb(id) {
   if (d && d.bbox) map.fitBounds([[d.bbox[1], d.bbox[0]], [d.bbox[3], d.bbox[2]]], { maxZoom: 10, padding: [40, 40] });
   const layers = layersByVnb[id];
   if (layers && layers.length) layers[0].openTooltip();
+  if (isMobile()) setSidebarOpen(false);  // reveal the map after picking a VNB from the list
 }
 
 // ---------- for.Watt coverage (from the maintained list, resolved on each load) ----------
