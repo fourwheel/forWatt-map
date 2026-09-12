@@ -91,7 +91,6 @@ body {
 .fw-item { display: flex; flex-direction: column; gap: 3px; font-size: .76rem; padding: 6px 6px; border-radius: 8px; cursor: default; }
 .fw-row1 { display: flex; align-items: center; gap: 8px; }
 .fw-item .check { color: #1a8f3c; font-weight: 700; font-size: .78rem; line-height: 1; width: 8px; text-align: center; flex-shrink: 0; }
-.fw-item.unmatched .where { background: var(--accent-2); color: #5c4a00; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
 .fw-item.matched { cursor: pointer; }
 .fw-item.matched:hover { background: var(--accent-bg); }
 .fw-item .who { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

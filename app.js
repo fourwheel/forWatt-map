@@ -287,7 +287,7 @@ function renderForwattList() {
     // some VNBs from the registry have no mapped municipality polygon (no shape
     // to zoom to) - show them, but don't dress them up as clickable
     const hasGeo = !!(layersByVnb[p.vnbId] && layersByVnb[p.vnbId].length);
-    const where = hasGeo ? esc(p.city || '') : '<span class="no-geo">kein Kartengebiet</span>';
+    const where = hasGeo ? esc(p.city || '') : '<span class="no-geo">nicht kartiert</span>';
     return `
     <div class="fw-item${hasGeo ? ' matched' : ''}" data-id="${p.vnbId}">
       <div class="fw-row1">
@@ -299,7 +299,7 @@ function renderForwattList() {
   };
   const otherItem = p => `
     <div class="fw-item unmatched">
-      <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.name)}</span><span class="where">wMSB</span></div>
+      <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.name)}</span></div>
     </div>`;
   // one scrolling list; the group headings are sticky so "wMSB" stays visible
   // once you scroll to it, while its items only appear as you scroll further
