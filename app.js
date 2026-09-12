@@ -32,7 +32,6 @@ function smColor(r) {
 }
 const smValue = id => { const e = smData[id]; return e ? e[state.smMetric] : null; };
 const smMit = id => { const e = smData[id]; return e ? e.mit : null; };        // fixed metric for partner figures
-const pct = r => r == null ? 'k. A.' : (r * 100).toFixed(1) + ' %';
 
 // ---------- filtering ----------
 function passes(id) {
@@ -280,15 +279,24 @@ async function loadForwatt() {
 function renderForwattList() {
   const el = document.getElementById('forwatt-list');
   const parts = state.coverage.partners;
-  const matched = parts.filter(p => p.vnbId).sort((a, b) => (smMit(b.vnbId) ?? -1) - (smMit(a.vnbId) ?? -1));
+  const matched = parts.filter(p => p.vnbId).sort((a, b) => a.vnbName.localeCompare(b.vnbName));
   const other = parts.filter(p => !p.vnbId).sort((a, b) => a.name.localeCompare(b.name));
-  const matchedItem = p => `
-    <div class="fw-item matched" data-id="${p.vnbId}">
-      <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.vnbName)}</span><span class="where">${esc(p.city || '')}</span></div>
-      <div class="fw-metrics">
-        <span title="Smart-Meter-Quote (mit opt. Einbaufällen)">${pct(smMit(p.vnbId))} Pflichteinbaufälle mit iMSys</span>
+  const matchedItem = p => {
+    const v = smMit(p.vnbId);
+    const label = v == null ? 'k. A.' : Math.round(v * 100) + '%';
+    // some VNBs from the registry have no mapped municipality polygon (no shape
+    // to zoom to) - show them, but don't dress them up as clickable
+    const hasGeo = !!(layersByVnb[p.vnbId] && layersByVnb[p.vnbId].length);
+    const where = hasGeo ? esc(p.city || '') : '<span class="no-geo">kein Kartengebiet</span>';
+    return `
+    <div class="fw-item${hasGeo ? ' matched' : ''}" data-id="${p.vnbId}">
+      <div class="fw-row1">
+        <span class="check">✓</span>
+        <span class="who">${esc(p.vnbName)} <span class="fw-pct" title="Smart-Meter-Quote: Pflichteinbaufälle mit iMSys">(${label})</span></span>
+        <span class="where">${where}</span>
       </div>
     </div>`;
+  };
   const otherItem = p => `
     <div class="fw-item unmatched">
       <div class="fw-row1"><span class="check">✓</span><span class="who">${esc(p.name)}</span><span class="where">wMSB</span></div>
@@ -296,9 +304,12 @@ function renderForwattList() {
   // one scrolling list; the group headings are sticky so "wMSB" stays visible
   // once you scroll to it, while its items only appear as you scroll further
   el.innerHTML =
-    `<div class="fw-group">Grundzuständige MSB · mit Netzgebiet · ${matched.length}</div>` +
+    `<div class="fw-group">
+      <span>Grundzuständige MSB · mit Netzgebiet · ${matched.length}</span>
+      <span class="fw-group-metric">Messstellenbetreiber (% Pflichteinbaufälle mit iMSys)</span>
+    </div>` +
     matched.map(matchedItem).join('') +
-    `<div class="fw-group">Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}</div>` +
+    `<div class="fw-group fw-group-wmsb">Wettbewerbliche / überregionale MSB · ${other.length}</div>` +
     other.map(otherItem).join('');
   el.querySelectorAll('.fw-item.matched').forEach(it => it.onclick = () => focusVnb(it.dataset.id));
 }
