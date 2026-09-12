@@ -75,13 +75,19 @@ body {
 .fw-wmsb-note { font-size: .72rem; font-weight: 600; color: #8a6d00; background: var(--accent-2); border-radius: 6px; padding: 4px 8px; margin-top: 10px; }
 .fw-foot { font-size: .64rem; color: var(--muted); margin-top: 8px; opacity: .85; }
 
-.forwatt-list { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-height: 40px; overflow-y: auto; }
-/* wMSB heading stays put between the two lists (not part of either scroll area),
-   so it's always visible even before the user scrolls down to it */
-.fw-group-fixed { flex: 0 0 auto; margin-top: 10px; }
-.forwatt-list-wmsb { flex: 0 1 140px; min-height: 40px; }
-.fw-group { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 10px 0 3px; font-weight: 600; }
+.forwatt-list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
+.fw-group {
+  position: sticky; top: 0; z-index: 1; background: var(--panel2);
+  display: flex; flex-direction: column; gap: 1px;
+  font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text);
+  margin: 10px 0 4px; padding: 7px 8px; border-radius: 8px; font-weight: 700;
+}
+.fw-group-metric { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: .66rem; color: var(--muted); }
 .fw-group:first-child { margin-top: 0; }
+/* the wMSB heading docks to the bottom edge instead, so it's visible from
+   the very start (before any scrolling) as a hint that more content follows;
+   it detaches once the list is scrolled past it, revealing its items */
+.fw-group-wmsb { top: auto; bottom: 0; }
 .fw-item { display: flex; flex-direction: column; gap: 3px; font-size: .76rem; padding: 6px 6px; border-radius: 8px; cursor: default; }
 .fw-row1 { display: flex; align-items: center; gap: 8px; }
 .fw-item .check { color: #1a8f3c; font-weight: 700; font-size: .78rem; line-height: 1; width: 8px; text-align: center; flex-shrink: 0; }
@@ -89,10 +95,9 @@ body {
 .fw-item.matched { cursor: pointer; }
 .fw-item.matched:hover { background: var(--accent-bg); }
 .fw-item .who { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-item .who .fw-pct { color: var(--muted); font-weight: 400; }
 .fw-item .where { color: var(--muted); margin-left: auto; font-size: .7rem; flex-shrink: 0; }
-.fw-metrics { display: flex; gap: 6px; padding-left: 16px; flex-wrap: wrap; }
-.fw-metrics span { font-size: .68rem; color: var(--muted); background: var(--panel2); border-radius: 5px; padding: 1px 6px; }
-.fw-metrics span:first-child { color: var(--accent); background: var(--accent-bg); font-weight: 600; }
+.fw-item .where .no-geo { font-style: italic; opacity: .8; }
 
 /* switch */
 .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
