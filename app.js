@@ -160,10 +160,6 @@ function wireControls() {
   // start with the map in view on phones; the sidebar opens as an overlay on demand
   if (isMobile()) setSidebarOpen(false);
 
-  const forwattListEl = document.getElementById('forwatt-list');
-  if (forwattListEl) forwattListEl.onscroll = updateForwattFade;
-  window.addEventListener('resize', updateForwattFade);
-
   // Filter-Panel (inkl. #reset-btn) ist im HTML auskommentiert.
   const resetBtn = document.getElementById('reset-btn');
   if (resetBtn) resetBtn.onclick = () => {
@@ -283,6 +279,8 @@ async function loadForwatt() {
 }
 function renderForwattList() {
   const el = document.getElementById('forwatt-list');
+  const heading = document.getElementById('forwatt-wmsb-heading');
+  const wmsbEl = document.getElementById('forwatt-wmsb-list');
   const parts = state.coverage.partners;
   const matched = parts.filter(p => p.vnbId).sort((a, b) => (smMit(b.vnbId) ?? -1) - (smMit(a.vnbId) ?? -1));
   const other = parts.filter(p => !p.vnbId).sort((a, b) => a.name.localeCompare(b.name));
@@ -299,21 +297,12 @@ function renderForwattList() {
     </div>`;
   el.innerHTML =
     `<div class="fw-group">Grundzuständige MSB · mit Netzgebiet · ${matched.length}</div>` +
-    matched.map(matchedItem).join('') +
-    `<div class="fw-group">Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}</div>` +
-    other.map(otherItem).join('');
+    matched.map(matchedItem).join('');
+  // heading sits outside both lists so it stays visible even before the wMSB
+  // list itself (below it) is scrolled into view
+  heading.textContent = `Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}`;
+  wmsbEl.innerHTML = other.map(otherItem).join('');
   el.querySelectorAll('.fw-item.matched').forEach(it => it.onclick = () => focusVnb(it.dataset.id));
-  updateForwattFade();
-}
-
-// shows a bottom fade on the list while there's more content to scroll to
-// (e.g. the wMSB group below the matched VNBs), hides it once fully scrolled
-function updateForwattFade() {
-  const list = document.getElementById('forwatt-list');
-  const fade = document.getElementById('forwatt-list-fade');
-  if (!list || !fade) return;
-  const hasMore = list.scrollHeight - list.scrollTop - list.clientHeight > 2;
-  fade.classList.toggle('visible', hasMore);
 }
 
 init();
