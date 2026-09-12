@@ -160,6 +160,10 @@ function wireControls() {
   // start with the map in view on phones; the sidebar opens as an overlay on demand
   if (isMobile()) setSidebarOpen(false);
 
+  const forwattListEl = document.getElementById('forwatt-list');
+  if (forwattListEl) forwattListEl.onscroll = updateForwattFade;
+  window.addEventListener('resize', updateForwattFade);
+
   // Filter-Panel (inkl. #reset-btn) ist im HTML auskommentiert.
   const resetBtn = document.getElementById('reset-btn');
   if (resetBtn) resetBtn.onclick = () => {
@@ -299,6 +303,17 @@ function renderForwattList() {
     `<div class="fw-group">Wettbewerbliche / überregionale MSB (wMSB) · ${other.length}</div>` +
     other.map(otherItem).join('');
   el.querySelectorAll('.fw-item.matched').forEach(it => it.onclick = () => focusVnb(it.dataset.id));
+  updateForwattFade();
+}
+
+// shows a bottom fade on the list while there's more content to scroll to
+// (e.g. the wMSB group below the matched VNBs), hides it once fully scrolled
+function updateForwattFade() {
+  const list = document.getElementById('forwatt-list');
+  const fade = document.getElementById('forwatt-list-fade');
+  if (!list || !fade) return;
+  const hasMore = list.scrollHeight - list.scrollTop - list.clientHeight > 2;
+  fade.classList.toggle('visible', hasMore);
 }
 
 init();

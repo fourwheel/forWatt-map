@@ -75,7 +75,14 @@ body {
 .fw-wmsb-note { font-size: .72rem; font-weight: 600; color: #8a6d00; background: var(--accent-2); border-radius: 6px; padding: 4px 8px; margin-top: 10px; }
 .fw-foot { font-size: .64rem; color: var(--muted); margin-top: 8px; opacity: .85; }
 
+.forwatt-list-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
 .forwatt-list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
+.forwatt-list-fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 36px;
+  background: linear-gradient(to bottom, rgba(245,246,247,0), var(--panel) 85%);
+  pointer-events: none; opacity: 0; transition: opacity .2s ease;
+}
+.forwatt-list-fade.visible { opacity: 1; }
 .fw-group { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 10px 0 3px; font-weight: 600; }
 .fw-group:first-child { margin-top: 0; }
 .fw-item { display: flex; flex-direction: column; gap: 3px; font-size: .76rem; padding: 6px 6px; border-radius: 8px; cursor: default; }
