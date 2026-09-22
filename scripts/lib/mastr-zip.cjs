@@ -8,7 +8,7 @@
 const https = require('https');
 const zlib = require('zlib');
 
-function get(url, headers) {
+function getOnce(url, headers) {
   return new Promise((resolve, reject) => {
     https.get(url, { headers }, res => {
       if (res.statusCode !== 200 && res.statusCode !== 206) {
@@ -22,6 +22,19 @@ function get(url, headers) {
       res.on('error', reject);
     }).on('error', reject);
   });
+}
+// Large single-shot range reads against this host occasionally die mid-stream
+// with ECONNRESET; retry a few times with backoff rather than losing the
+// whole (multi-minute) scan to a transient network blip.
+async function get(url, headers, attempts = 5) {
+  for (let i = 1; ; i++) {
+    try {
+      return await getOnce(url, headers);
+    } catch (e) {
+      if (i >= attempts) throw e;
+      await new Promise(r => setTimeout(r, 1000 * i));
+    }
+  }
 }
 async function head(url) {
   return new Promise((resolve, reject) => {
