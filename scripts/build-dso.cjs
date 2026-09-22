@@ -22,7 +22,7 @@ const { readXlsxSheet } = require('./lib/xlsx-mini.cjs');
 const MsbMatch = require('../lib/match.js');
 
 const ROLLOUT_XLSX_URL = 'https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/' +
-  'NetzzugangMesswesen/Mess-undZaehlwesen/iMSys/_DL/Roll-out-Quoten_Q4_2025.xlsx?__blob=publicationFile&v=3';
+  'NetzzugangMesswesen/Mess-undZaehlwesen/iMSys/_DL/Roll-out-Quoten_H1_2026.xlsx?__blob=publicationFile&v=1';
 
 function fetchBuffer(url) {
   return new Promise((resolve, reject) => {
@@ -60,11 +60,12 @@ function colorFor(id) {
   return `hsl(${h % 360}, 60%, 55%)`;
 }
 
-// "Roll-out-Quoten iMSys Q4 2025" -> "Q4 2025"; "Stand 31. Dezember 2025" -> "2025-12-31"
+// "Roll-out-Quoten iMSys Q4 2025" -> "Q4 2025"; "Roll-out-Quoten iMSys H1 2026" -> "H1 2026"
+// "Stand 31. Dezember 2025" -> "2025-12-31"
 const MONTHS = { Januar: 1, Februar: 2, März: 3, April: 4, Mai: 5, Juni: 6, Juli: 7, August: 8,
   September: 9, Oktober: 10, November: 11, Dezember: 12 };
 function parseTitle(title) {
-  const label = (/(Q[1-4]\s*\d{4})/.exec(title) || [, title.trim()])[1];
+  const label = (/((?:Q[1-4]|H[12])\s*\d{4})/.exec(title) || [, title.trim()])[1];
   return label.replace(/\s+/g, ' ').trim();
 }
 function parseDate(stand) {
@@ -78,11 +79,16 @@ async function main() {
   log('fetching BNetzA rollout quota table...');
   const xlsxBuf = await fetchBuffer(ROLLOUT_XLSX_URL);
   const { rows } = readXlsxSheet(xlsxBuf);
-  const title = rows[0][0], stand = rows[0][5];
+  // BNetzA sometimes prepends disclaimer/blank rows before the title row, so
+  // find it by content ("Roll-out-Quoten iMSys ...") rather than assuming row 0.
+  const titleIdx = rows.findIndex(r => r && typeof r[0] === 'string' && /Roll-out-Quoten/.test(r[0]));
+  if (titleIdx < 0) throw new Error('title row ("Roll-out-Quoten iMSys ...") not found in xlsx');
+  const title = rows[titleIdx][0], stand = rows[titleIdx][5];
   const label = parseTitle(title), date = parseDate(stand);
   log(`period: ${label} (${date}) — "${title.trim()}" / "${stand}"`);
 
-  const quotaRows = rows.slice(2).filter(r => r && r[0]).map(r => ({
+  // data rows start two rows below the title row (title row, then a column-header row)
+  const quotaRows = rows.slice(titleIdx + 2).filter(r => r && r[0]).map(r => ({
     name: r[0],
     ohne: typeof r[2] === 'number' ? r[2] : null,
     mit: typeof r[4] === 'number' ? r[4] : null,
