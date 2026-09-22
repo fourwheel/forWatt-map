@@ -80,6 +80,23 @@ async function getLatestExportUrl() {
   return m[0];
 }
 
+// Neuwerk and Scharhörn/Nigehörn — two North Sea islands that are legally
+// part of Hamburg (they share Hamburg's Gemeindeschluessel 02000000 with the
+// mainland city), but are on a different Netzbetreiber's grid than Hamburger
+// Energienetze. The per-Gemeinde majority vote can't distinguish them from
+// the mainland, so without this they'd be wrongly painted as Hamburger
+// Energienetze territory. Drop these disjoint exclave polygon parts by their
+// known bounding box rather than guess at the correct operator.
+const HAMBURG_AGS = '02000000';
+const HAMBURG_ISLAND_EXCLAVE_BBOX = [8.35, 53.85, 8.60, 54.00]; // Neuwerk + Scharhörn/Nigehörn
+
+function stripExclaveParts(geometry, [bx0, by0, bx1, by1]) {
+  if (geometry.type !== 'MultiPolygon') return geometry;
+  const inBox = ([x, y]) => x >= bx0 && x <= bx1 && y >= by0 && y <= by1;
+  const kept = geometry.coordinates.filter(poly => !poly[0].every(inBox));
+  return kept.length === geometry.coordinates.length ? geometry : { ...geometry, coordinates: kept };
+}
+
 function bboxOf(geometry) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const walk = coords => {
@@ -120,12 +137,13 @@ async function main() {
     const vnbId = gemeindeToVnb.get(ags);
     if (!vnbId) continue; // no MaStR-derived data for this Gemeinde — leave it out rather than guess
     const op = netzbetreiber.get(Number(vnbId));
+    const geometry = ags === HAMBURG_AGS ? stripExclaveParts(f.geometry, HAMBURG_ISLAND_EXCLAVE_BBOX) : f.geometry;
     features.push({
       type: 'Feature',
       properties: { vnb_id: vnbId, name: op.name, city: op.city, types: op.types, ags, gemeinde: f.properties.gen },
-      geometry: f.geometry,
+      geometry,
     });
-    const [minX, minY, maxX, maxY] = bboxOf(f.geometry);
+    const [minX, minY, maxX, maxY] = bboxOf(geometry);
     const b = bboxByVnb.get(vnbId);
     bboxByVnb.set(vnbId, b
       ? [Math.min(b[0], minX), Math.min(b[1], minY), Math.max(b[2], maxX), Math.max(b[3], maxY)]
