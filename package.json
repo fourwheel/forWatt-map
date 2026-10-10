@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/check-coverage.cjs",
+    "list-prospects": "node scripts/list-prospects.cjs",
     "build-dso": "node --max-old-space-size=6144 scripts/build-dso.cjs",
     "build-geo": "node --max-old-space-size=6144 scripts/build-geo.cjs"
   }
