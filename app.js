@@ -8,6 +8,7 @@ const state = {
   matched: new Set(),
   selected: null,
   hovered: null,         // vnb_id currently under the cursor
+  searchHit: null,       // vnb_id picked via search / list: stays highlighted
 };
 
 let map, geoLayer, dsoById = {}, dsoList = [], smData = {}, layersByVnb = {};
@@ -49,7 +50,11 @@ function passes(id) {
 }
 
 // ---------- map styling ----------
+// a region picked via search keeps its hover look until the search is cleared
 function styleFor(feature) {
+  return feature.properties.vnb_id === state.searchHit ? hoverStyleFor(feature) : baseStyleFor(feature);
+}
+function baseStyleFor(feature) {
   const id = feature.properties.vnb_id;
   const ok = passes(id);
   const fill = smColor(smValue(id));
@@ -76,7 +81,7 @@ const solidStyle = c => ({ stroke: true, color: c, weight: 1, opacity: 1, fillCo
 // hover: covered regions turn a darker shade of their own colour; non-covered
 // regions, invisible at rest, show up in blue
 function hoverStyleFor(feature) {
-  const base = styleFor(feature);
+  const base = baseStyleFor(feature);
   const id = feature.properties.vnb_id;
   if (state.forwatt) return solidStyle(state.matched.has(id) ? smColor(smValue(id), .78) : '#6FA3D6');
   const lift = Math.min(Math.max(base.fillOpacity, .5) + .22, .95);
@@ -99,6 +104,7 @@ function tooltipHtml(f) {
   return `<div class="vnb-tt">
     <h3>${esc(p.name)}</h3>
     <div class="c">${esc(p.city || '')} · ${(p.types || []).length} Spannungsebenen</div>
+    ${p.gemeinde ? `<div class="gem">Gemeinde <b>${esc(p.gemeinde)}</b></div>` : ''}
     <div class="kv"><span>Smart Meter (Pflichteinbaufälle)</span><b>${sm != null ? (sm * 100).toFixed(1) + ' %' : 'k. A.'}</b></div>
     ${cov ? `<div class="fw">✓ Abgedeckt durch for.Watt</div>` : ''}
   </div>`;
@@ -151,7 +157,8 @@ async function init() {
       const id = f.properties.vnb_id;
       (layersByVnb[id] || (layersByVnb[id] = [])).push(layer);
       layer.bindTooltip(() => tooltipHtml(f), { className: 'vnb-tt', sticky: true, direction: 'top' });
-      layer.on('click', () => { state.selected = id; restyle(); });
+      // click a region: it stays highlighted; a click on empty map clears that
+      layer.on('click', e => { L.DomEvent.stopPropagation(e); state.selected = id; highlight(id); });
       layer.on('mouseover', () => {
         state.hovered = id;
         layersByVnb[id].forEach(l => {
@@ -165,14 +172,162 @@ async function init() {
       });
     },
   }).addTo(map);
+  map.on('click', () => { if (state.searchHit != null) highlight(null); });
 
   addMapLegend();
+  addSearch(geoLayer);
   document.getElementById('loading').style.display = 'none';
   wireControls();
   // renderLegend();  // Kartenmodus-Panel (inkl. #legend) ist im HTML auskommentiert
   renderList();
   updateCount();
   loadForwatt();  // auto-refresh coverage on every page open
+}
+
+// ---------- search: Städte / Gemeinden / Netzbetreiber (Stadtwerke etc.) ----------
+const LAENDER = { '01': 'SH', '02': 'HH', '03': 'NI', '04': 'HB', '05': 'NW', '06': 'HE', '07': 'RP', '08': 'BW',
+  '09': 'BY', '10': 'SL', '11': 'BE', '12': 'BB', '13': 'MV', '14': 'SN', '15': 'ST', '16': 'TH' };
+// lenient matching: case, accents, ß, and ä/ae spellings all compare equal
+const norm = s => String(s).toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u')
+  .replace(/[^a-z0-9]+/g, ' ').trim();
+// 0: name starts with the query, 1: a word starts with it, 2: contains it
+function matchScore(key, q) {
+  if (key.startsWith(q)) return 0;
+  if (key.includes(' ' + q)) return 1;
+  return key.includes(q) ? 2 : -1;
+}
+
+function addSearch(layer) {
+  // one entry per Gemeinde (some consist of several polygons)
+  const gemByAgs = new Map();
+  layer.eachLayer(l => {
+    const p = l.feature.properties;
+    let g = gemByAgs.get(p.ags);
+    if (!g) gemByAgs.set(p.ags, g = { kind: 'gem', name: p.gemeinde, key: norm(p.gemeinde),
+      land: LAENDER[String(p.ags).slice(0, 2)] || '', vnbId: p.vnb_id, layers: [] });
+    g.layers.push(l);
+  });
+  const entries = [...gemByAgs.values(), ...dsoList.map(d => ({ kind: 'vnb', name: d.name.trim(),
+    key: norm(d.name), cityKey: norm(d.city || ''), city: d.city || '', vnbId: d.id,
+    hasGeo: !!(layersByVnb[d.id] && layersByVnb[d.id].length) }))];
+
+  const ctl = L.control({ position: 'topright' });
+  ctl.onAdd = () => {
+    const el = L.DomUtil.create('div', 'map-search');
+    el.innerHTML = `
+      <div class="ms-box">
+        <input type="search" placeholder="Stadt, Gemeinde oder Netzbetreiber suchen…" aria-label="Suche" autocomplete="off" spellcheck="false">
+        <button class="ms-clear" type="button" title="Suche leeren" hidden>✕</button>
+      </div>
+      <div class="ms-results" hidden></div>`;
+    L.DomEvent.disableClickPropagation(el);
+    L.DomEvent.disableScrollPropagation(el);
+    return el;
+  };
+  ctl.addTo(map);
+  const root = ctl.getContainer();
+  const input = root.querySelector('input'), clearBtn = root.querySelector('.ms-clear');
+  const box = root.querySelector('.ms-results');
+  let hits = [], active = 0;
+
+  function search(qRaw) {
+    const q = norm(qRaw);
+    if (q.length < 2) return [];
+    const scored = [];
+    for (const e of entries) {
+      let s = matchScore(e.key, q);
+      if (s < 0 && e.kind === 'vnb') { s = matchScore(e.cityKey, q); if (s >= 0) s += 1; }  // VNB found via its seat
+      if (s >= 0) scored.push([s, e]);
+    }
+    scored.sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length || a[1].name.localeCompare(b[1].name, 'de'));
+    const pick = kind => scored.filter(x => x[1].kind === kind).slice(0, 6).map(x => x[1]);
+    return [...pick('gem'), ...pick('vnb')];
+  }
+
+  function itemHtml(e, i) {
+    const partner = state.matched.has(e.vnbId);
+    const v = smMit(e.vnbId);
+    const quote = partner ? ` · ${v == null ? 'k. A.' : Math.round(v * 100) + ' %'}` : '';
+    const tag = partner ? `<span class="ms-tag">for.Watt${quote}</span>` : '';
+    if (e.kind === 'gem') {
+      const vnb = dsoById[e.vnbId];
+      return `<div class="ms-item" data-i="${i}"><div class="ms-name">${esc(e.name)}${e.land ? ` <span class="ms-land">${e.land}</span>` : ''}</div>
+        <div class="ms-sub">${esc(vnb ? vnb.name.trim() : '')} ${tag}</div></div>`;
+    }
+    return `<div class="ms-item${e.hasGeo ? '' : ' disabled'}" data-i="${i}"><div class="ms-name">${esc(e.name)}</div>
+      <div class="ms-sub">${esc(e.city)}${e.hasGeo ? '' : ' · <i>nicht kartiert</i>'} ${tag}</div></div>`;
+  }
+
+  function render() {
+    const q = input.value;
+    clearBtn.hidden = !q;
+    if (norm(q).length < 2) { box.hidden = true; return; }
+    hits = search(q);
+    active = hits.findIndex(isSelectable);
+    if (!hits.length) { box.innerHTML = '<div class="ms-empty">Keine Treffer</div>'; box.hidden = false; return; }
+    const nGem = hits.filter(e => e.kind === 'gem').length;
+    box.innerHTML = hits.map((e, i) =>
+      (i === 0 && nGem ? '<div class="ms-group">Städte &amp; Gemeinden</div>' : '') +
+      (i === nGem ? '<div class="ms-group">Netzbetreiber</div>' : '') + itemHtml(e, i)).join('');
+    box.querySelectorAll('.ms-item').forEach(it => {
+      it.onmousedown = ev => { ev.preventDefault(); choose(hits[+it.dataset.i]); };
+    });
+    markActive();
+    box.hidden = false;
+  }
+  const isSelectable = e => e.kind === 'gem' || e.hasGeo;
+  function markActive() {
+    box.querySelectorAll('.ms-item').forEach(it => it.classList.toggle('active', +it.dataset.i === active));
+    const a = box.querySelector('.ms-item.active');
+    if (a) a.scrollIntoView({ block: 'nearest' });
+  }
+  function move(dir) {
+    if (!hits.length) return;
+    let i = active;
+    for (let n = 0; n < hits.length; n++) {
+      i = (i + dir + hits.length) % hits.length;
+      if (isSelectable(hits[i])) { active = i; break; }
+    }
+    markActive();
+  }
+
+  function choose(e) {
+    if (!e || !isSelectable(e)) return;
+    input.value = e.name;
+    box.hidden = true;
+    input.blur();
+    if (e.kind === 'vnb') { focusVnb(e.vnbId); return; }
+    const bounds = L.latLngBounds([]);
+    e.layers.forEach(l => bounds.extend(l.getBounds()));
+    highlight(e.vnbId);
+    map.fitBounds(bounds, { maxZoom: 11, padding: [40, 40] });
+    e.layers[0].openTooltip(bounds.getCenter());
+    if (isMobile()) setSidebarOpen(false);
+  }
+  function clear() {
+    input.value = ''; box.hidden = true; clearBtn.hidden = true;
+    (layersByVnb[state.searchHit] || []).forEach(l => l.closeTooltip());
+    highlight(null);
+  }
+
+  input.addEventListener('input', render);
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 120));
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); move(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); move(-1); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); choose(hits[active]); }
+    else if (ev.key === 'Escape') { if (!box.hidden) box.hidden = true; else clear(); }
+  });
+  clearBtn.onclick = () => { clear(); input.focus(); };
+}
+
+// keep one VNB's regions highlighted (search / list pick); null clears it
+function highlight(id) {
+  state.searchHit = id;
+  restyle();
+  if (id != null && layersByVnb[id]) layersByVnb[id].forEach(l => l.bringToFront());
 }
 
 // ---------- outside Germany: a veil over foreign countries and the sea ----------
@@ -319,7 +474,7 @@ function renderList() {
 }
 
 function focusVnb(id) {
-  state.selected = id; restyle();
+  state.selected = id; highlight(id);
   const d = dsoById[id];
   if (d && d.bbox) map.fitBounds([[d.bbox[1], d.bbox[0]], [d.bbox[3], d.bbox[2]]], { maxZoom: 10, padding: [40, 40] });
   const layers = layersByVnb[id];
