@@ -104,7 +104,7 @@ function tooltipHtml(f) {
   return `<div class="vnb-tt">
     <h3>${esc(p.name)}</h3>
     <div class="c">${esc(p.city || '')} · ${(p.types || []).length} Spannungsebenen</div>
-    ${p.gemeinde ? `<div class="gem">Gemeinde <b>${esc(p.gemeinde)}</b></div>` : ''}
+    ${p.gemeinde ? `<div class="gem">Ort <b>${esc(p.gemeinde)}</b></div>` : ''}
     <div class="kv"><span>Smart Meter (Pflichteinbaufälle)</span><b>${sm != null ? (sm * 100).toFixed(1) + ' %' : 'k. A.'}</b></div>
     ${cov ? `<div class="fw">✓ Abgedeckt durch for.Watt</div>` : ''}
   </div>`;
@@ -173,6 +173,7 @@ async function init() {
     },
   }).addTo(map);
   map.on('click', () => { if (state.searchHit != null) highlight(null); });
+  initOutline();
 
   addMapLegend();
   addSearch(geoLayer);
@@ -217,7 +218,7 @@ function addSearch(layer) {
     const el = L.DomUtil.create('div', 'map-search');
     el.innerHTML = `
       <div class="ms-box">
-        <input type="search" placeholder="Stadt, Gemeinde oder Netzbetreiber suchen…" aria-label="Suche" autocomplete="off" spellcheck="false">
+        <input type="search" placeholder="Stadt oder Netzbetreiber suchen…" aria-label="Suche" autocomplete="off" spellcheck="false">
         <button class="ms-clear" type="button" title="Suche leeren" hidden>✕</button>
       </div>
       <div class="ms-results" hidden></div>`;
@@ -268,10 +269,14 @@ function addSearch(layer) {
     if (!hits.length) { box.innerHTML = '<div class="ms-empty">Keine Treffer</div>'; box.hidden = false; return; }
     const nGem = hits.filter(e => e.kind === 'gem').length;
     box.innerHTML = hits.map((e, i) =>
-      (i === 0 && nGem ? '<div class="ms-group">Städte &amp; Gemeinden</div>' : '') +
+      (i === 0 && nGem ? '<div class="ms-group">Städte</div>' : '') +
       (i === nGem ? '<div class="ms-group">Netzbetreiber</div>' : '') + itemHtml(e, i)).join('');
     box.querySelectorAll('.ms-item').forEach(it => {
-      it.onmousedown = ev => { ev.preventDefault(); choose(hits[+it.dataset.i]); };
+      // pick on click, not mousedown: hiding the list on mousedown let the
+      // following mouseup/click land on the map, whose click clears the
+      // highlight again. preventDefault keeps the focus (no blur-close).
+      it.onmousedown = ev => ev.preventDefault();
+      it.onclick = () => choose(hits[+it.dataset.i]);
     });
     markActive();
     box.hidden = false;
@@ -300,7 +305,7 @@ function addSearch(layer) {
     if (e.kind === 'vnb') { focusVnb(e.vnbId); return; }
     const bounds = L.latLngBounds([]);
     e.layers.forEach(l => bounds.extend(l.getBounds()));
-    highlight(e.vnbId);
+    highlight(e.vnbId, e.layers);
     map.fitBounds(bounds, { maxZoom: 11, padding: [40, 40] });
     e.layers[0].openTooltip(bounds.getCenter());
     if (isMobile()) setSidebarOpen(false);
@@ -323,11 +328,85 @@ function addSearch(layer) {
   clearBtn.onclick = () => { clear(); input.focus(); };
 }
 
-// keep one VNB's regions highlighted (search / list pick); null clears it
-function highlight(id) {
+// keep one VNB's regions highlighted (search / list pick); null clears it.
+// gemLayers: the searched Gemeinde's polygons, drawn with a dashed outline
+function highlight(id, gemLayers = null) {
   state.searchHit = id;
+  outline.gemLayers = id != null ? gemLayers : null;
   restyle();
   if (id != null && layersByVnb[id]) layersByVnb[id].forEach(l => l.bringToFront());
+  drawOutline();
+}
+
+// ---------- outline of the highlighted VNB area ----------
+// A VNB area is made of many Gemeinde polygons, so stroking them would also
+// draw every inner border. Instead, on a canvas of its own: stroke all of them
+// thickly, then erase their interiors (destination-out). What's left is just
+// the outer edge of the whole area. The erase pass also strokes thinly, which
+// closes hairline gaps between neighbouring Gemeinden that would otherwise
+// leave specks of outline inside.
+const OUTLINE = { color: '#394D55', width: 2.5, gemColor: '#1D1D1D' };
+const outline = { canvas: null, gemLayers: null };
+
+function initOutline() {
+  const pane = map.createPane('outline');
+  pane.style.zIndex = 410;              // above the regions (400), below tooltips
+  pane.style.pointerEvents = 'none';
+  outline.canvas = L.DomUtil.create('canvas', '', pane);
+  // positions go stale while Leaflet animates a zoom - hide, redraw at the end
+  map.on('zoomstart', () => { outline.canvas.style.visibility = 'hidden'; });
+  map.on('moveend resize', drawOutline);
+}
+
+// polygons of a layer as [polygon][ring][LatLng], whatever its geometry type
+function polygonsOf(layer) {
+  const ll = layer.getLatLngs();
+  if (L.LineUtil.isFlat(ll)) return [[ll]];
+  if (L.LineUtil.isFlat(ll[0])) return [ll];
+  return ll;
+}
+
+function drawOutline() {
+  const canvas = outline.canvas;
+  if (!canvas) return;
+  const size = map.getSize(), pad = size.multiplyBy(.3).round();   // margin so short pans stay drawn
+  const topLeft = map.containerPointToLayerPoint(pad.multiplyBy(-1)).round();
+  const w = size.x + 2 * pad.x, h = size.y + 2 * pad.y, dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  L.DomUtil.setPosition(canvas, topLeft);
+  canvas.style.visibility = 'visible';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const layers = state.searchHit != null ? layersByVnb[state.searchHit] : null;
+  if (!layers || !layers.length) return;
+  const polys = layers.flatMap(polygonsOf);
+  const tracePoly = poly => poly.forEach(ring => {
+    ring.forEach((ll, i) => {
+      const p = map.latLngToLayerPoint(ll).subtract(topLeft);
+      i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y);
+    });
+    ctx.closePath();
+  });
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // 1) thick stroke around every polygon (half of it lies outside the area)
+  ctx.beginPath(); polys.forEach(tracePoly);
+  ctx.strokeStyle = OUTLINE.color; ctx.lineWidth = 2 * (OUTLINE.width + 1); ctx.stroke();
+  // 2) erase the inside (+1px, to close gaps between neighbours)
+  ctx.globalCompositeOperation = 'destination-out';
+  polys.forEach(poly => { ctx.beginPath(); tracePoly(poly); ctx.fill('evenodd'); });
+  ctx.beginPath(); polys.forEach(tracePoly); ctx.lineWidth = 2; ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 3) the searched Gemeinde: thin dashed outline on top
+  if (outline.gemLayers) {
+    ctx.beginPath(); outline.gemLayers.flatMap(polygonsOf).forEach(tracePoly);
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = OUTLINE.gemColor; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 // ---------- outside Germany: a veil over foreign countries and the sea ----------
