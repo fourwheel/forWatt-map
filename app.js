@@ -27,19 +27,29 @@ function setSidebarOpen(open) {
 }
 
 // ---------- color scale ----------
-// for.Watt logo gradient: yellow (low quota) -> orange (high quota).
+// for.Watt palette (forwatt.io): light yellow -> yellow -> amber -> dark
+// orange. The stops span a wide range of lightness, so neighbouring quotas
+// stay tellable apart (yellow -> orange alone are about equally light).
 // Most quotas sit between 0 and 40 %, so the scale saturates at SM_SCALE_MAX
-// instead of 100 % - otherwise nearly every region would look the same yellow.
-const SM_LOW = [0xFF, 0xC1, 0x00], SM_HIGH = [0xFF, 0x73, 0x00], SM_SCALE_MAX = .5;
-// partner without a published quota ("k. A."): a solid slate, clearly visible
-// on the greyscale base map and clearly not part of the yellow-orange scale
-const SM_NA = [0x5E, 0x75, 0x80];
+// instead of 100 % - otherwise nearly every region would look the same.
+const SM_STOPS = [
+  [0xFF, 0xE2, 0x86],   // yellow-200
+  [0xFF, 0xC1, 0x00],   // yellow-500
+  [0xF0, 0x80, 0x1A],   // amber-500
+  [0xBF, 0x45, 0x1A],   // orange-600
+];
+const SM_SCALE_MAX = .5;
+// partner without a published quota ("k. A."): for.Watt petrol - the palette's
+// only cool colour, so it can't be mistaken for a point on the scale
+const SM_NA = [0x25, 0x89, 0x98];
+const rgb = (c, shade = 1) => `rgb(${c.map(v => Math.round(v * shade)).join(',')})`;
 function smColor(r, shade = 1) {   // shade < 1 darkens (used for hover)
-  if (r == null) return `rgb(${SM_NA.map(v => Math.round(v * shade)).join(',')})`;
-  const t = Math.min(Math.max(r / SM_SCALE_MAX, 0), 1);
-  const c = SM_LOW.map((lo, i) => Math.round((lo + (SM_HIGH[i] - lo) * t) * shade));
-  return `rgb(${c.join(',')})`;
+  if (r == null) return rgb(SM_NA, shade);
+  const t = Math.min(Math.max(r / SM_SCALE_MAX, 0), 1) * (SM_STOPS.length - 1);
+  const i = Math.min(Math.floor(t), SM_STOPS.length - 2), f = t - i;
+  return rgb(SM_STOPS[i].map((a, k) => a + (SM_STOPS[i + 1][k] - a) * f), shade);
 }
+const smGradientCss = () => `linear-gradient(90deg, ${SM_STOPS.map(c => rgb(c)).join(', ')})`;
 const smValue = id => { const e = smData[id]; return e ? e[state.smMetric] : null; };
 const smMit = id => { const e = smData[id]; return e ? e.mit : null; };        // fixed metric for partner figures
 
@@ -79,11 +89,11 @@ function baseStyleFor(feature) {
 const REGIONS_OPACITY = .85;
 const solidStyle = c => ({ stroke: true, color: c, weight: 1, opacity: 1, fillColor: c, fillOpacity: 1 });
 // hover: covered regions turn a darker shade of their own colour; non-covered
-// regions, invisible at rest, show up in blue
+// regions, invisible at rest, show up in neutral grey (for.Watt gray-300): colour = partner, grey = none
 function hoverStyleFor(feature) {
   const base = baseStyleFor(feature);
   const id = feature.properties.vnb_id;
-  if (state.forwatt) return solidStyle(state.matched.has(id) ? smColor(smValue(id), .78) : '#6FA3D6');
+  if (state.forwatt) return solidStyle(state.matched.has(id) ? smColor(smValue(id), .78) : '#889499');
   const lift = Math.min(Math.max(base.fillOpacity, .5) + .22, .95);
   return { ...base, weight: 1.6, color: '#1D1D1D', opacity: .9, dashArray: null, fillOpacity: lift };
 }
@@ -499,9 +509,9 @@ function addMapLegend() {
     const el = L.DomUtil.create('div', 'map-legend');
     const max = SM_SCALE_MAX * 100;
     el.innerHTML = `
-      <div class="ml-title">Smart-Meter-Quote der Partner</div>
+      <div class="ml-title">Smart Meter Quote</div>
       <div class="ml-sub">Pflichteinbaufälle mit iMSys</div>
-      <div class="ml-bar" style="background:linear-gradient(90deg, ${smColor(0)}, ${smColor(SM_SCALE_MAX)}); opacity:${REGIONS_OPACITY}"></div>
+      <div class="ml-bar" style="background:${smGradientCss()}; opacity:${REGIONS_OPACITY}"></div>
       <div class="ml-ticks"><span>0 %</span><span>${max / 2} %</span><span>≥ ${max} %</span></div>
       <div class="ml-na"><span class="ml-swatch" style="background:${smColor(null)}; opacity:${REGIONS_OPACITY}"></span>keine Angabe (k. A.)</div>`;
     L.DomEvent.disableClickPropagation(el);
@@ -514,7 +524,7 @@ function addMapLegend() {
 function renderLegend() {
   const el = document.getElementById('legend');
   const ids = Object.keys(dsoById).filter(passes);
-  const grad = `linear-gradient(90deg, ${smColor(0)}, ${smColor(SM_SCALE_MAX)})`;
+  const grad = smGradientCss();
   const ticks = ['0 %', '25 %', `≥ ${SM_SCALE_MAX * 100} %`];
   const vals = ids.map(smValue).filter(v => v != null);
   const kA = ids.length - vals.length;
